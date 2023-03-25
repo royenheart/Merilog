@@ -1,5 +1,3 @@
-use std::f32::consts::E;
-use std::fs::File;
 use std::str::Lines;
 use std::{collections::VecDeque, str::Chars, char};
 use crate::mistakes::show::{Froms, LineType};
@@ -9,7 +7,7 @@ use crate::mistakes::show::Mis;
 use super::{Tokens};
 
 const EOF: char = '\0';
-const EOF_str: &str = "\0";
+const EOF_STR: &str = "\0";
 
 /// 词法分析主体
 pub struct Analysis<'a> {
@@ -30,7 +28,7 @@ pub struct Analysis<'a> {
 }
 
 impl<'a> Analysis<'a> {
-    fn new(file: &'a str, source: &'a String) -> Self { 
+    pub fn new(file: &'a str, source: &'a String) -> Self { 
         let mut me = Analysis { 
             file, iter_line: source.lines(), iter_c: source.chars(), 
             line: "", line_offset: 1, c_offset: 0, 
@@ -47,7 +45,7 @@ impl<'a> Analysis<'a> {
         me
     }
     
-    fn new_with_capacity(file: &'static str, source: &'a String, capacity: usize) -> Self {
+    pub fn new_with_capacity(file: &'a str, source: &'a String, capacity: usize) -> Self {
         let default = Analysis::new(file, source);
         Self {
             buf: VecDeque::<Tokens>::with_capacity(capacity),
@@ -61,7 +59,7 @@ impl<'a> Analysis<'a> {
                 if c == '\n' {
                     self.line = match self.iter_line.next() {
                         Some(x) => x,
-                        None => EOF_str
+                        None => EOF_STR
                     };
                     self.line_offset += 1; self.c_offset = 0;  
                 }
@@ -93,7 +91,7 @@ impl<'a> Analysis<'a> {
         self.peek
     }
     
-    fn next_token(&mut self) -> Result<Tokens, Mis> {
+    pub fn next_token(&mut self) -> Result<Tokens, Mis> {
         loop {
             if self.peek == ' ' || self.peek == '\n' { 
                 self.readch(); 

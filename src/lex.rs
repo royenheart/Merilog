@@ -1,7 +1,5 @@
 //! 词法分析器
 
-use std::fmt::Display;
-
 pub mod analysis;
 pub mod preprocessor;
 
@@ -129,7 +127,7 @@ pub enum Tokens {
 }
 
 impl Tokens {
-    fn gen_binary_g(&self) -> String {
+    pub fn gen_binary_g(&self) -> String {
         match self {
             Tokens::CommentBlock(x) => format!("(Comment Block, \"{}\")", x),
             Tokens::CommentModule(x) => format!("(Comment Module, \"{}\")", x),
