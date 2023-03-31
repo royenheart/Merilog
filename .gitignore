@@ -1,3 +1,5 @@
 /target
 examples/tests
 examples/outs
+.vscode
+docs/tests

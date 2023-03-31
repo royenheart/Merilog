@@ -1,3 +1,4 @@
+use core::panic;
 use std::str::Lines;
 use std::{collections::VecDeque, str::Chars, char};
 use crate::mistakes::show::{Froms, LineType};
@@ -25,6 +26,25 @@ pub struct Analysis<'a> {
     buf: VecDeque<Tokens>,
     peek: char,
     file: &'a str
+}
+
+impl Iterator for Analysis<'_> {
+    type Item = Tokens;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.next_token() {
+            Ok(x) => {
+                match x {
+                    Tokens::End => None,
+                    _ => Some(x)
+                }
+            },
+            Err(e) => {
+                println!("{}", e);
+                panic!("Lex error")
+            }
+        }
+    }
 }
 
 impl<'a> Analysis<'a> {
@@ -852,7 +872,12 @@ mod analysis_tests {
         let mut source = std::env::current_dir().unwrap();
         source.push("examples/sources/s1.ms");
         let mut test = std::env::current_dir().unwrap();
-        test.push("examples/tests/test_serize.txt");
+        test.push("examples/tests/");
+        // 创建目录
+        if !&test.exists() {
+            std::fs::create_dir(&test).unwrap();
+        }
+        test.push("test_serize.txt");
         let fs = File::open(source).unwrap();
         let s = preprocessor(&fs);
         let mut analysis = Analysis::new_with_capacity("s1.ms", &s, s.len());
@@ -861,7 +886,7 @@ mod analysis_tests {
         loop {
             let x = analysis.next_token().unwrap();
             if x != Tokens::End {
-                ft.write_all(format!("{}\n", x.gen_binary_g()).as_bytes()).unwrap();
+                ft.write_all(format!("{}\n", x.dump()).as_bytes()).unwrap();
             } else {
                 break;
             }

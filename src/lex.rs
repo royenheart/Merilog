@@ -26,7 +26,7 @@ pub mod preprocessor;
 /// 关键字
 /// 1. if else while loop break match fn struct
 /// 2. ->（函数返回值，用于定义中） return（函数体内返回） let mut
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Tokens {
     /// 块注释
     CommentBlock(String),
@@ -44,7 +44,7 @@ pub enum Tokens {
     Div,
     /// 取余
     Mod,
-    /// 取反
+    /// 取反 !
     Negate,
     /// \>
     Gt,
@@ -122,12 +122,14 @@ pub enum Tokens {
     ShouldReturn,
     /// 函数返回值，函数体中
     Return,
-    /// 源程序读入结束标志
+    /// 源程序读入结束标志（也可以作为语法的开始标志）
     End,
+    /// 空
+    Null
 }
 
 impl Tokens {
-    pub fn gen_binary_g(&self) -> String {
+    pub fn dump(&self) -> String {
         match self {
             Tokens::CommentBlock(x) => format!("(Comment Block, \"{}\")", x),
             Tokens::CommentModule(x) => format!("(Comment Module, \"{}\")", x),
@@ -181,6 +183,7 @@ impl Tokens {
             Tokens::ShouldReturn => "(ShouldReturn, )".to_string(),
             Tokens::Return => "(Return, )".to_string(),
             Tokens::End => "(End, )".to_string(),
+            Tokens::Null => "(ε, )".to_string()
         }
     }
 }
