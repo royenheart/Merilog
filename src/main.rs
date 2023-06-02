@@ -3,17 +3,17 @@
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use std::rc::Rc;
 
-use Merilog::lex::Tokens;
 use Merilog::lex::analysis::Analysis;
 use Merilog::lex::preprocessor::preprocessor;
+use Merilog::semantic::llvmir_gen::IrGen;
 use Merilog::syntax::ll_parser::RecursiveDescentParser;
-use Merilog::table::symbol::Envs;
+use Merilog::table::symbol::SymbolManager;
 use id_tree_layout::Layouter;
+use inkwell::context::Context;
 
 pub const VERSION: &str = "0.1.0";
-pub const ARGS_PAT: &str = "[-h] [-v] [ -P | -Preprocess ] [ -L | --Lex ] [ -S | -Syntax [--Visual <vi_output>]] [-o <output>] <input>"; 
+pub const ARGS_PAT: &str = "[-h] [-v] [ -P | -Preprocess ] [ -L | --Lex ] [ -S | -Syntax [--Visual <vi_output>]] [-I | --IR] [-o <output>] <input>"; 
 
 fn usage() {
     println!("Merilog use method: {}", ARGS_PAT);
@@ -25,9 +25,10 @@ fn main() {
     // 解析参数
     let mut input = String::new();
     let mut output = String::new();
-    let mut just_lex = false;
-    let mut just_prepocess = false;
-    let mut just_syntax = false;
+    let mut print_lex = false;
+    let mut print_preprocess = false;
+    let mut print_syntax = false;
+    let mut print_ir = false;
     let mut visualize = false;
     let mut vi_str = String::new();
     let mut version = false;
@@ -44,16 +45,19 @@ fn main() {
                 break;
             }
             "-L" | "--Lex" => {
-                just_lex = true;
+                print_lex = true;
             },
             "-P" | "--Preprocess" => {
-                just_prepocess = true;
+                print_preprocess = true;
             },
             "-S" | "--Syntax" => {
-                just_syntax = true;
+                print_syntax = true;
             },
+            "-I" | "--IR" => {
+                print_ir = true;
+            }
             "--Visual" => {
-                if just_syntax {
+                if print_syntax {
                     if i + 1 < args.len() {
                         visualize = true;
                         vi_str = args[i + 1].clone();
@@ -105,9 +109,7 @@ fn main() {
         return;
     }
     if output.is_empty() {
-        // default
         output = input.clone();
-        output.push_str(".out");
     }
     let file =  match std::fs::File::open(&input) {
         Ok(f) => f,
@@ -116,48 +118,75 @@ fn main() {
             return;
         }
     };
-    let mut ft = match File::create(&output) {
-        Ok(f) => f,
+    let raw = preprocessor(&file);
+    let analysis = Analysis::new_with_capacity(&input, &raw, raw.len());
+    let mut parser: RecursiveDescentParser = match RecursiveDescentParser::new(analysis) {
+        Ok(p) => p,
         Err(e) => {
-            println!("can't write compiled code to output \"{}\": {}", &output, e);
+            println!("{}", e);
             return;
         }
     };
-    let raw = preprocessor(&file);
-    let table = Rc::new(Envs::new());
-    if just_prepocess {
-        ft.write_all(raw.as_bytes()).unwrap();
+    let parse_ok = parser.parse();
+    let context = Context::create();
+    let mut symbols = SymbolManager::new();
+    let mut llvmir_gen_engine = IrGen::new(parser.get_ast(), &context, &mut symbols, "main");
+    let result = llvmir_gen_engine.gen();
+    if parse_ok {
+        println!("语法分析成功！");
+    } else {
+        println!("语法分析失败！");
+    }
+    if let Err(e) = &result {
+        println!("语义分析失败：{}", e);
         return;
+    } else {
+        println!("语义分析成功！");
     }
-    if just_lex {
-        let mut analysis = Analysis::new_with_capacity(&input, &raw, raw.len());
-        loop {
-            let x: Tokens = match analysis.next_token() {
-                Ok(t) => t,
-                Err(e) => {
-                    println!("{}", e);
-                    return;
-                }
-            };
-            if x != Tokens::End {
-                ft.write_all(format!("{}\n", x.dump()).as_bytes()).unwrap();
-            } else {
-                break;
-            }
-        };
+    let verified = llvmir_gen_engine.verify();
+    if let Err(e) = &verified {
+        println!("IR 代码检查失败：{}", e);
+        return;
+    } else {
+        println!("IR 代码检查成功！");
     }
-    if just_syntax {
-        let analysis = Analysis::new_with_capacity(&input, &raw, raw.len());
-        let mut parser: RecursiveDescentParser = match RecursiveDescentParser::new(analysis, table) {
-            Ok(p) => p,
+    if print_preprocess {
+        let mut o = output.clone();
+        o.push_str(".preprocess");
+        let mut ft_preprocess = match File::create(&o) {
+            Ok(f) => f,
             Err(e) => {
-                println!("{}", e);
+                println!("无法创建预处理结果文件 \"{}\": {}", &o, e);
                 return;
             }
         };
-        match parser.parse() {
+        ft_preprocess.write_all(raw.as_bytes()).unwrap();
+    }
+    if print_lex {
+        let mut o = output.clone();
+        o.push_str(".lex");
+        let mut ft_lex = match File::create(&o) {
+            Ok(f) => f,
+            Err(e) => {
+                println!("无法创建词法分析结果文件 \"{}\": {}", &o, e);
+                return;
+            }
+        };
+        parser.get_tokens().clone().into_iter().for_each(|x| ft_lex.write_all(format!("{}\n", x.dump()).as_bytes()).unwrap());
+    }
+    if print_syntax {
+        let mut o = output.clone();
+        o.push_str(".syntax");
+        let mut ft_syntax = match File::create(&o) {
+            Ok(f) => f,
+            Err(e) => {
+                println!("无法创建语法分析结果文件 \"{}\": {}", &o, e);
+                return;
+            }
+        };
+        match parse_ok {
             true => {
-                ft.write_all(format!("{}\n", parser.dump()).as_bytes()).unwrap();
+                ft_syntax.write_all(format!("{}\n", parser.dump()).as_bytes()).unwrap();
                 if visualize {
                     let t = parser.get_ast();
                     Layouter::new(t)
@@ -170,5 +199,17 @@ fn main() {
                 println!("Syntax analysis failed!");
             }
         }
+    }
+    if print_ir {
+        let mut o = output;
+        o.push_str(".ll");
+        match File::create(&o) {
+            Ok(_) => (),
+            Err(e) => {
+                println!("无法创建语义分析结果文件 \"{}\": {}", &o, e);
+                return;
+            }
+        };
+        llvmir_gen_engine.dump_to_file(o);
     }
 }

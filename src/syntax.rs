@@ -1,8 +1,11 @@
 //! 语法分析
 
+// 2023.6.6，目前文法还不能识别 !!true 这种多重单目运算。。。
+// ExecExpSigOp -> SigOps ... 这块需要多重定义一下。。。
+
 pub mod ll_parser;
 
-use std::hash::Hash;
+use std::{hash::Hash, fmt::{Debug, Display}, borrow::BorrowMut};
 
 use id_tree::Tree;
 use id_tree_layout::Visualize;
@@ -23,34 +26,10 @@ use crate::lex::Tokens;
 // 实现可变不可变借用
 // 实现作用域
 // 实现 match 语句
-// 如果能实现 match 语句，那么 if 语句是否还有必要实现（？
 // 语言的特性是什么
 // Tokens 枚举为终结符，其余均为非终结符
 // 语句块（也相当于函数内语句块，最后一个可以为单纯的表达式，表示返回值）
 // 强类型，表达式有类型，语句的类型是()，即空元组
-
-// type Epsilon = Vec<ASTNode>;
-// type T = Tokens;
-// type AN = ASTNode;
-
-// lazy_static! {
-//     static ref test_str: String = "s".to_string();
-//     static ref Epsilons: HashMap<NT, Vec<Epsilon>> = {
-//         let mut ret = HashMap::new();
-//         ret.insert(NT::Merilog, vec![
-//             vec![AN::NT(NT::DefineStruct), AN::NT(NT::Merilog)],
-//             vec![AN::NT(NT::DefineFn), AN::NT(NT::Merilog)],
-//             vec![AN::T(Tokens::Null)]
-//         ]);
-//         ret.insert(NT::DefineStruct, vec![
-
-//         ]);
-//         ret
-//     };
-//     static ref Firsts: HashMap<NT, Vec<Tokens>> = HashMap::new();
-//     static ref Follows: HashMap<NT, Vec<Tokens>> = HashMap::new();
-//     static ref LL1_Table: HashMap<(NT, Tokens), Epsilon> = HashMap::new();
-// }
 
 /* 
 
@@ -301,13 +280,14 @@ Follow(ExecLoop) = {Tokens::EndExp}
 引用示例：
 1. 变量： var
 2. 数组成员：var[1]
-3. 元组：var->0
+3. 元组成员：var->0
 4. 结构体：var->field1
 5. 函数：var(...)
 可以嵌套使用：
 1. var[1]->0->field1
 2. var(...)[1] - 后面语义分析的时候可能需要进行确认合法性
 元组类型是 (Type1, Type2, ...)
+
 ExecVar -> Tokens::Identity ExecVarT
 ExecVarT -> Tokens::LeftMB Tokens::Int Tokens::RightMB ExecVarT | Tokens::ShouldReturn ExecVarSoE ExecVarT | Tokens::Null | Tokens::LeftC ExecFuncP Tokens::RightC ExecVarT
 ExecVarSoE -> Tokens::Int | Tokens::Identity
@@ -331,14 +311,14 @@ Follow(ExecFuncParamsE) = {Tokens::RightC}
 
 类型声明（单独类型，也可以是复合类型（数组、元组））
 元组类型允许空（语句的类型）
-ExecType -> Tokens::Identity | Tokens::LeftMB Tokens::Identity Tokens::EndExp Tokens::Int Tokens::RightMB | Tokens::LeftC ExecTypesP Tokens::RightC
+ExecType -> Tokens::Identity | Tokens::LeftMB ExecType Tokens::EndExp Tokens::Int Tokens::RightMB | Tokens::LeftC ExecTypesP Tokens::RightC
 ExecTypesP -> ExecTypesParams | Tokens::Null
-ExecTypesParams -> Tokens::Identity ExecTypesParamsE
+ExecTypesParams -> ExecType ExecTypesParamsE
 ExecTypesParamsE -> Tokens::Comma ExecTypesParams | Tokens::Null
 
 First(ExecType) = {Tokens::Identity, Tokens::LeftMB, Tokens::LeftC}
-First(ExecTypesP) = {Tokens::Identity, Tokens::Null}
-First(ExecTypesParams) = {Tokens::Identity}
+First(ExecTypesP) = {Tokens::Identity, Tokens::LeftMB, Tokens::LeftC, Tokens::Null}
+First(ExecTypesParams) = {Tokens::Identity, Tokens::LeftMB, Tokens::LeftC}
 First(ExecTypesParamsE) = {Tokens::Comma, Tokens::Null}
 
 Follow(ExecType) = {Tokens::Is, Tokens::Comma, Tokens::EndExp, Tokens::RightC, Tokens::LeftBC, Tokens::RightBC}
@@ -382,7 +362,7 @@ Follow(FnBody) = {Tokens::RightBC}
 pub type AST = Tree<ASTNode>;
 
 /// 非终结符
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum NT {
     // 开始符号
     Merilog,
@@ -466,7 +446,7 @@ pub enum NT {
 }
 
 /// 抽象语法树结点
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ASTNode {
     /// 终结符
     T(Tokens),

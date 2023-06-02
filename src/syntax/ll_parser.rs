@@ -1,6 +1,6 @@
 //! LL1 递归下降分析
 
-use std::rc::Rc;
+use std::fmt::{Debug, Display};
 
 use id_tree::{Node, NodeId};
 use id_tree::InsertBehavior::AsRoot;
@@ -11,7 +11,6 @@ use id_tree::LevelOrderTraversal;
 use crate::lex::Tokens;
 use crate::lex::analysis::Analysis;
 use crate::mistakes::show::Mis;
-use crate::table::symbol::Envs;
 use super::{AST, NT};
 use super::{ASTNode};
 
@@ -38,12 +37,11 @@ pub struct RecursiveDescentParser {
     tokens: Vec<Tokens>,
     // 当前分析词法索引
     current: usize,
-    tree: AST,
-    symbol_table: Rc<Envs>
+    tree: AST
 }
 
 impl RecursiveDescentParser {
-    pub fn new(lexer: Analysis, symbol_table: Rc<Envs>) -> Result<RecursiveDescentParser, Mis> {
+    pub fn new(lexer: Analysis) -> Result<RecursiveDescentParser, Mis> {
         let mut tree = AST::new();
         let root: Node<ASTNode> = Node::new(ASTNode::NT(NT::Merilog));
         tree.insert(root, AsRoot).unwrap();
@@ -53,8 +51,7 @@ impl RecursiveDescentParser {
         tokens.push(Tokens::End);
         Ok(RecursiveDescentParser { 
             tokens,
-            current: 0, tree,
-            symbol_table
+            current: 0, tree
         })
     }
 
@@ -95,6 +92,10 @@ impl RecursiveDescentParser {
 
     pub fn get_ast(&self) -> &AST {
         &self.tree
+    }
+
+    pub fn get_tokens(&self) -> &Vec<Tokens> {
+        &self.tokens
     }
 
     /// 返回 AST 头节点索引
@@ -443,7 +444,7 @@ impl RecursiveDescentParser {
     
     fn match_define_var_value(&mut self, root: &NodeId) -> bool {
         let cur = self.current;
-        let me = insert_nt!(self.tree, root, NT::DefineVarType);
+        let me = insert_nt!(self.tree, root, NT::DefineVarValue);
 
         'l: {
             if self.term(Tokens::Is, true, None) {
@@ -1586,7 +1587,7 @@ impl RecursiveDescentParser {
             }
 
             if self.term(Tokens::LeftMB, true, Some(&me)) {
-                if self.term_identity(true, Some(&me)).is_some() &&
+                if self.match_exec_type(&me) &&
                     self.term(Tokens::EndExp, true, Some(&me)) &&
                     self.term_int(true, Some(&me)).is_some() &&
                     self.term(Tokens::RightMB, true, Some(&me)) {
@@ -1615,7 +1616,10 @@ impl RecursiveDescentParser {
         let me = insert_nt!(self.tree, root, NT::ExecTypesP);
 
         'l: {
-            if self.term_identity(false, None).is_some() {
+            if self.term_identity(false, None).is_some() || 
+                self.terms(vec![
+                    Tokens::LeftMB, Tokens::LeftC
+                ], false, None) {
                 if self.match_exec_types_params(&me) {
                     return true;
                 }
@@ -1639,7 +1643,7 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecTypesParams);
 
-        if self.term_identity(true, Some(&me)).is_some() && 
+        if self.match_exec_type(&me) &&
             self.match_exec_types_params_e(&me) {
             return true;
         }
@@ -1824,112 +1828,87 @@ impl RecursiveDescentParser {
 mod ll_parser_tests {
     use std::fs::File;
 
-    use crate::lex::preprocessor::preprocessor;
+    use crate::lex::{preprocessor::preprocessor};
 
     use super::*;
 
+    macro_rules! ll_parser_test_macro {
+        ($file:expr, $test:expr) => {
+            let file_path = format!("examples/sources/{}", $file);
+            let mut path = std::env::current_dir().unwrap();
+            path.push(file_path);
+            let file = File::open(path).unwrap();
+            let preprocess = preprocessor(&file);
+            let analysis = Analysis::new_with_capacity($file, &preprocess, preprocess.len());
+            let mut parser: RecursiveDescentParser = RecursiveDescentParser::new(analysis).unwrap();
+            let r = parser.parse();
+            parser.print_test();
+            println!("current: {:?}", parser.get_current());
+            if $test {
+                assert!(r);
+            } else {
+                assert!(!r);
+            }
+        };
+    }
+
     #[test]
     fn test1() {
-        let table = Rc::new(Envs::new());
-        let mut path = std::env::current_dir().unwrap();
-        path.push("examples/sources/s8.ms");
-        let file = File::open(path).unwrap();
-        let s: String = preprocessor(&file);
-        let analysis = Analysis::new_with_capacity("s1.ms", &s, s.len());
-        let mut parser: RecursiveDescentParser = RecursiveDescentParser::new(analysis, table).unwrap();
-        let r = parser.parse();
-        parser.print_test();
-        println!("current: {:?}", parser.get_current());
-        assert!(r);
+        ll_parser_test_macro!("s8.ms", true);
     }
 
     #[test]
     fn test2() {
-        let table = Rc::new(Envs::new());
-        let mut path = std::env::current_dir().unwrap();
-        path.push("examples/sources/s9.ms");
-        let file = File::open(path).unwrap();
-        let s: String = preprocessor(&file);
-        let analysis = Analysis::new_with_capacity("s1.ms", &s, s.len());
-        let mut parser: RecursiveDescentParser = RecursiveDescentParser::new(analysis, table).unwrap();
-        let r = parser.parse();
-        parser.print_test();
-        println!("current: {:?}", parser.get_current());
-        assert!(r);
+        ll_parser_test_macro!("s9.ms", true);
     }
 
     #[test]
     fn test3() {
-        let table = Rc::new(Envs::new());
-        let mut path = std::env::current_dir().unwrap();
-        path.push("examples/sources/s10.ms");
-        let file = File::open(path).unwrap();
-        let s: String = preprocessor(&file);
-        let analysis = Analysis::new_with_capacity("s1.ms", &s, s.len());
-        let mut parser: RecursiveDescentParser = RecursiveDescentParser::new(analysis, table).unwrap();
-        let r = parser.parse();
-        parser.print_test();
-        println!("current: {:?}", parser.get_current());
-        assert!(!r);
+        ll_parser_test_macro!("s10.ms", false);
     }
 
     #[test]
     fn test4() {
-        let table = Rc::new(Envs::new());
-        let mut path = std::env::current_dir().unwrap();
-        path.push("examples/sources/s11.ms");
-        let file = File::open(path).unwrap();
-        let s: String = preprocessor(&file);
-        let analysis = Analysis::new_with_capacity("s1.ms", &s, s.len());
-        let mut parser: RecursiveDescentParser = RecursiveDescentParser::new(analysis, table).unwrap();
-        let r = parser.parse();
-        parser.print_test();
-        println!("current: {:?}", parser.get_current());
-        assert!(r);
+        ll_parser_test_macro!("s11.ms", true);
     }
 
     #[test]
     fn test5() {
-        let table = Rc::new(Envs::new());
-        let mut path = std::env::current_dir().unwrap();
-        path.push("examples/sources/s12.ms");
-        let file = File::open(path).unwrap();
-        let s: String = preprocessor(&file);
-        let analysis = Analysis::new_with_capacity("s1.ms", &s, s.len());
-        let mut parser: RecursiveDescentParser = RecursiveDescentParser::new(analysis, table).unwrap();
-        let r = parser.parse();
-        parser.print_test();
-        println!("current: {:?}", parser.get_current());
-        assert!(r);
+        ll_parser_test_macro!("s12.ms", true);
     }
 
     #[test]
     fn test6() {
-        let table = Rc::new(Envs::new());
-        let mut path = std::env::current_dir().unwrap();
-        path.push("examples/sources/s13.ms");
-        let file = File::open(path).unwrap();
-        let s: String = preprocessor(&file);
-        let analysis = Analysis::new_with_capacity("s1.ms", &s, s.len());
-        let mut parser: RecursiveDescentParser = RecursiveDescentParser::new(analysis, table).unwrap();
-        let r = parser.parse();
-        parser.print_test();
-        println!("current: {:?}", parser.get_current());
-        assert!(r);
+        ll_parser_test_macro!("s13.ms", true);
     }
 
     #[test]
     fn test7() {
-        let table = Rc::new(Envs::new());
-        let mut path = std::env::current_dir().unwrap();
-        path.push("examples/sources/s14.ms");
-        let file = File::open(path).unwrap();
-        let s: String = preprocessor(&file);
-        let analysis = Analysis::new_with_capacity("s1.ms", &s, s.len());
-        let mut parser: RecursiveDescentParser = RecursiveDescentParser::new(analysis, table).unwrap();
-        let r = parser.parse();
-        parser.print_test();
-        println!("current: {:?}", parser.get_current());
-        assert!(!r);
+        ll_parser_test_macro!("s14.ms", false);
+    }
+
+    #[test]
+    fn test8() {
+        ll_parser_test_macro!("s15.ms", true);
+    }
+
+    #[test]
+    fn test9() {
+        ll_parser_test_macro!("s16.ms", false);
+    }
+
+    #[test]
+    fn test10() {
+        ll_parser_test_macro!("s17.ms", true);
+    }
+
+    #[test]
+    fn test11() {
+        ll_parser_test_macro!("s18.ms", true);
+    }
+
+    #[test]
+    fn test12() {
+        ll_parser_test_macro!("s19.ms", true);
     }
 }

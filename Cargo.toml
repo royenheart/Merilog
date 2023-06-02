@@ -6,7 +6,9 @@ edition = "2021"
 [dependencies]
 id_tree = "1.8.0"
 id_tree_layout = "2.0.4"
+inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm15-0"] }
 lazy_static = "1.4.0"
+llvm-sys = "150.0.5"
 
 [dev-dependencies]
 graphviz-rust = "0.6.1"

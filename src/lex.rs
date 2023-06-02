@@ -1,5 +1,7 @@
 //! 词法分析器
 
+use std::fmt::{Debug, Display};
+
 pub mod analysis;
 pub mod preprocessor;
 
