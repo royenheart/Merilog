@@ -2,6 +2,8 @@
 name = "Merilog"
 version = "0.1.0"
 edition = "2021"
+authors = [ "RoyenHeart royenheart@outlook.com" ]
+repository = "https://github.com/royenheart/Merilog"
 
 [dependencies]
 id_tree = "1.8.0"

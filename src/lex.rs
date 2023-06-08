@@ -1,6 +1,6 @@
 //! 词法分析器
 
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
 pub mod analysis;
 pub mod preprocessor;
@@ -48,37 +48,37 @@ pub enum Tokens {
     Mod,
     /// 取反 !
     Negate,
-    /// \>
+    /// \>，大于
     Gt,
-    /// <
+    /// <，小于
     Lt,
-    /// \>=
+    /// \>=，大于等于
     Ge,
-    /// <=
+    /// <=，小于等于
     Le,
-    /// ==
+    /// ==，相等
     Eq,
-    /// !=
+    /// !=，不等于
     Ne,
-    /// +=
+    /// +=，加等于
     PlusIs,
-    /// -=
+    /// -=，减等于
     MinusIs,
-    /// /=
+    /// /=，除等于
     DivIs,
-    /// *=
+    /// *=，乘等于
     MulIs,
-    /// %=
+    /// %=，模等于
     ModIs,
-    /// =
+    /// =，等于
     Is,
-    /// &
+    /// &，算数与
     And,
-    /// &&
+    /// &&，逻辑与
     AndS,
-    /// |
+    /// |，算数或
     Or,
-    /// ||
+    /// ||，逻辑或
     OrS,
     /// ;
     EndExp,

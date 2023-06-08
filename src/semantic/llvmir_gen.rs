@@ -33,7 +33,7 @@
 // gen_op 可以有很多种情况，迫于时间问题就不一一实现了（做得到）
 
 use std::{
-    path::Path, collections::{HashMap, btree_map::Iter}, ffi::CStr, hash::Hash, rc::Rc, cell::RefCell, borrow::{Borrow, BorrowMut}, ptr, ops::Index, f32::consts::E, result,
+    path::Path, collections::HashMap, borrow::Borrow,
 };
 
 use id_tree::NodeId;
@@ -44,7 +44,7 @@ use inkwell::{
     context::Context,
     execution_engine::ExecutionEngine,
     module::Module,
-    types::{AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, VoidType, StructType, AnyType},
+    types::{AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, StructType, AnyType},
     values::{
         AnyValue, AnyValueEnum, BasicValue, BasicValueEnum, FunctionValue, InstructionValue, PointerValue, StructValue, BasicMetadataValueEnum,
     },
@@ -58,9 +58,8 @@ use crate::{
     table::symbol::SymbolManager,
 };
 
-/// 过滤特定节点
-/// 跳过（不包括本身）特定节点下的子树
-/// 后序遍历
+/// 过滤特定节点 \
+/// 以后序遍历，跳过（不包括本身）特定节点下的子树
 fn post_traversal_retain_and_skipsubtree(
     tree: &AST,
     root: &NodeId,
@@ -143,7 +142,7 @@ fn same_type(me: &AnyTypeEnum, other: &AnyTypeEnum) -> bool {
 // (忽略括号)
 // + 单目其实是 + +v，- 单目其实是 + -v，而 ! 单目直接进行运算
 lazy_static!{
-    static ref tok_priorities: HashMap<String, u8> = {
+    static ref TOK_PRIORITIES: HashMap<String, u8> = {
         let mut r = HashMap::new();
         r.insert(ASTNode::T(Tokens::LeftC).visualize(), 1);
         r.insert(ASTNode::T(Tokens::RightC).visualize(), 1);
@@ -169,10 +168,10 @@ lazy_static!{
 
 #[inline]
 fn judge_left_gt_right_priority(left: &ASTNode, right: &ASTNode) -> bool {
-    (*tok_priorities).get(&left.visualize()) > (*tok_priorities).get(&right.visualize())
+    (*TOK_PRIORITIES).get(&left.visualize()) > (*TOK_PRIORITIES).get(&right.visualize())
 }
 
-/// has_type 为 Type，表示类型（对于变量来说，需要指示其类型，Value 不一定代表（可能是 PointerValue））
+/// has_type 为 Type，表示类型（对于变量来说，需要指示其类型，Value 不一定代表（可能是 PointerValue））\
 /// has_type 为 None，则表示为未确定类型，需要延迟初始化，需要传入需要回填的基本块的ID
 #[derive(Debug, Clone)]
 pub enum HasType<'a> {
@@ -210,8 +209,6 @@ impl<'a> TyType<'a> {
 pub struct IrGen<'a, 'ctx> {
     ast: &'ctx AST,
     context: &'ctx Context,
-    // module: &'a Module<'ctx>,
-    // builder: &'a Builder<'ctx>,
     module: Module<'ctx>,
     builder: Builder<'ctx>,
     /// 类型符号表： \
@@ -223,8 +220,6 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
     pub fn new(
         ast: &'ctx AST,
         context: &'ctx Context,
-        // module: &'a Module<'ctx>,
-        // builder: &'a Builder<'ctx>,
         symbols: &'ctx mut SymbolManager<TyType<'a>, VType<'a>>,
         module_name: &str
     ) -> IrGen<'a, 'ctx> {
@@ -239,6 +234,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         }
     }
 
+    // 导出生成的 LLVM IR 代码
     pub fn dump(&self) -> String {
         self.module.print_to_string().to_string()
     }
@@ -304,6 +300,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         Ok(())
     }
 
+    // 验证构建的 LLVM IR 代码合法性
     pub fn verify(&self) -> Result<(), String> {
         match self.module.verify() {
             Ok(_) => Ok(()),
@@ -1282,8 +1279,8 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 // 遇上 _ ，只构建右表达式（函数使用等）
                 self.resolv_exec_exp(&ids[2], env, func)?;
             }
-            (_, _, None, Some(_), Some(_)) => {
-                return Err(format!("_ 无法用于 = 以外的赋值表达式"));
+            (o1, _, None, Some(_), Some(_)) => {
+                return Err(format!("_ 无法用于 = 以外的赋值表达式，当前运算符号为：{:?}", o1));
             },
             (ASTNode::T(Tokens::PlusIs), true, Some(HasType::Type(_)), Some(var_point), Some(var_value)) => {
                 let exp = self.resolv_exec_exp(&ids[2], env, func)?;
@@ -1325,7 +1322,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                     into_basic_value(new_exp).unwrap(),
                 );
             },
-            (ASTNode::T(Tokens::Is), true, Some(HasType::Type(_)), Some(var_point), Some(var_value)) => {
+            (ASTNode::T(Tokens::Is), true, Some(HasType::Type(_)), Some(var_point), Some(_)) => {
                 let exp = self.resolv_exec_exp(&ids[2], env, func)?;              
                 self.builder.build_store(
                     var_point.into_pointer_value(),
@@ -1417,7 +1414,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         basicb: Option<BasicBlock>,
         func: &FunctionValue,
     ) -> Result<AnyTypeEnum<'ctx>, String> {
-        let mut nodes = post_traversal_retain_and_skipsubtree(
+        let nodes = post_traversal_retain_and_skipsubtree(
             self.ast.borrow(),
             root,
             |x| !matches!(x, ASTNode::NT(NT::ExecExp) | ASTNode::NT(NT::FnBody)),
@@ -1448,7 +1445,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                         same_type(&ret, &fn_ret) {
                         ret = fn_ret;
                     } else {
-                        return Err(format!("If 主和 Else If 分支返回类型冲突"));
+                        return Err(format!("If 主和 Else If 分支返回类型冲突，应返回类型：{:?}，实际返回类型：{:?}", ret, fn_ret));
                     }
                     // 每一个分支结束后，若没有构建过 ret，都需要跳转至 merge_block（已经构建了 build_return 不用管，会被忽略）
                     if !broken_switch {
@@ -1477,7 +1474,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                             same_type(&ret, &fn_ret) {
                             ret = fn_ret;
                         } else {
-                            return Err(format!("If Else 分支返回类型冲突"));
+                            return Err(format!("If Else 分支返回类型冲突，应返回类型：{:?}，实际返回类型：{:?}", ret, fn_ret));
                         }
                         if !broken_switch {
                             self.builder.build_unconditional_branch(merge_block);
@@ -1535,7 +1532,6 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
     }
 
     /// 处理 Loop 循环语句，ExecLoop
-    /// 等同于函数
     /// 此时不注册新类型
     fn def_loop(
         &mut self,
@@ -1641,7 +1637,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                             // skip = ..;
                         }
                     } else {
-                        return Err(format!("以 _ 开头的成员引用仅支持：_ 和 _()"));
+                        return Err(format!("以 _ 开头的成员引用仅支持：_ 和 _()，当前成员引用为：{:?}", nodes));
                     }
                 } else {
                     let constv = self.basic_value(judge_n);
@@ -1664,8 +1660,8 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                                     vv = ptr.as_any_value_enum();
                                     (tmp.as_any_value_enum(), *t, false, Some(vt.has_type.clone()))
                                 } else {
-                                    // PointerValue
                                     if ptr.is_pointer_value() {
+                                        // PointerValue
                                         vv = self.builder.build_load(into_basic_type(*t).unwrap(), ptr.into_pointer_value(), "init_vv").as_any_value_enum();
                                     } else {
                                         // FunctionValue
@@ -1686,8 +1682,6 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             other => return Err(format!("引用第一个单词错误：{:?}", other))
         };
 
-        // vv = self.builder.build_load(into_basic_type(vt).unwrap(), vp.into_pointer_value(), "init_vv").as_any_value_enum();
-
         let mut itr = nodes.iter().enumerate().skip(skip);
         while let Some((index, n)) = itr.next() {
             match self.node_data(n) {
@@ -1697,8 +1691,8 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                         ASTNode::T(Tokens::Int(x)) => {
                             x
                         },
-                        _ => {
-                            return Err(format!("语法分析：数组索引识别出错"));
+                        other => {
+                            return Err(format!("语法分析：数组索引识别出错，识别到索引：{:?}", other));
                         }
                     } as u64, false);
                     // 跳过 LeftMB
@@ -1710,7 +1704,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                         vt = vvv_t.as_any_type_enum();
                         vv = self.builder.build_load(vvv_t, vp.into_pointer_value(), "load_arr_data").as_any_value_enum();
                     } else {
-                        return Err(format!("不能对数组以外的符号进行数组索引"));
+                        return Err(format!("不能对数组以外的符号进行数组索引，当前被引用对象：{:?}", vvv));
                     }
                 },
                 ASTNode::T(Tokens::LeftC) => {
@@ -1736,8 +1730,8 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                             vp = call_tmp.as_any_value_enum();
                             vv = call_ret_v.as_any_value_enum();
                         },
-                        _ => {
-                            return Err(format!("不知名函数"))
+                        other => {
+                            return Err(format!("不知名函数：{:?}", other))
                         }
                     }
                 },
@@ -1754,7 +1748,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                                 vt = vvv_t[i as usize].as_any_type_enum();
                                 vv = self.builder.build_load(vvv_t[i as usize], vp.into_pointer_value(), "load_tuple_data").as_any_value_enum();
                             } else {
-                                return Err(format!("不能对数组以外的符号进行数组索引"));
+                                return Err(format!("不能对数组以外的符号进行数组索引，当前被引用对象：{:?}", vvv));
                             }
                         },
                         ASTNode::T(Tokens::Identity(x)) => {
@@ -1771,15 +1765,14 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                                         (stty.params.clone(), stty.has_env.as_ref().unwrap())
                                     },
                                     None => {
-                                        return Err(format!("结构体类型信息未被记录，无法进行结构体引用"));
+                                        return Err(format!("结构体类型信息未被记录，无法进行结构体引用，名称为：{:?}", st));
                                     }
                                 }
                             } else {
-                                return Err(format!("无法对结构体以外的对象进行字段或结构体函数引用"));
+                                return Err(format!("无法对结构体以外的对象进行字段或结构体函数引用，当前被引用对象：{:?}", vvv));
                             }
                             match &nodes.get(n.0 + 1) {
                                 None => {
-                                    // 引用结构体的字段
                                     // 先查看是否在 params 内
                                     if let Some(i) = str_params.iter().position(|&f| f == x) {
                                         // 获取结构体字段;
@@ -1836,13 +1829,13 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                                 }
                             }
                         },
-                        _ => {
-                            return Err(format!("-> 引用，后应接数组、字段名称或函数调用"))
+                        other => {
+                            return Err(format!("-> 引用，后应接数组、字段名称或函数调用，此处引用为：{:?}", other))
                         }
                     }
                 },
-                _ => {
-                    return Err(format!("引用格式错误"))
+                other => {
+                    return Err(format!("引用格式错误，引用符号：{:?}", other))
                 }
             }
         }
@@ -1898,9 +1891,6 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             ASTNode::T(Tokens::Str(x)) => {
                 let c = self.builder.build_global_string_ptr(x, "str");
                 Ok(AnyValueEnum::PointerValue(c.as_pointer_value()))
-                // Ok(AnyValueEnum::ArrayValue(
-                //     self.context.const_string(x.as_bytes(), false),
-                // ))
             },
             ASTNode::T(Tokens::Bool(x)) => {
                 let v = match x {
@@ -1930,7 +1920,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
     /// bool: 布尔常数
     /// (): 空元组基本类型，空的不具名结构体类型
     /// 返回类型
-    fn basic_type(&self, x: &str, env: &NodeId) -> Result<AnyTypeEnum<'ctx>, String> {
+    fn basic_type(&self, x: &str) -> Result<AnyTypeEnum<'ctx>, String> {
         match x {
             "str" => {
                 let r = self.context.i8_type().ptr_type(AddressSpace::default());
@@ -1966,13 +1956,13 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
 
     /// 处理类型声明语句语义，ExecType
     /// 此时不注册新类型
-    /// 返回类型以及类型名称
+    /// 返回类型
     fn resolv_exec_type(&self, root: &NodeId, env: &NodeId) -> Result<AnyTypeEnum<'ctx>, String> {
         let ids = self.children_ids(root);
         match self.node_data(&ids[0]) {
             ASTNode::T(Tokens::Identity(x)) => {
                 // 判断是否为基本类型
-                if let Ok(r) = self.basic_type(x, env) {
+                if let Ok(r) = self.basic_type(x) {
                     return Ok(r);
                 }
                 // 判断在当前作用域以及其祖先作用域内是否存在该类型
@@ -2025,7 +2015,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
     /// 处理函数体
     /// 遍历 ExecSentence 调用对应函数进行处理
     /// 需要额外注意返回语句，判断函数体类型，返回函数体返回类型
-    /// basicb : 表示出口基本块（跳转语句等）
+    /// basicb : 表示在进行 break 等跳转时，需要跳至的块，由 loop、while 等产生
     /// 返回 FnBody 的返回类型，以及是否构建了 break / return 等破坏跳转关系的语句
     fn resolv_fn_body(
         &mut self,
@@ -2048,9 +2038,8 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         );
         let mut is_over = false;
         let mut l;
-        let itr = nodes.iter().enumerate();
-        for (index, n) in itr {
-            // 由于 ExecSentence 只可能出现在 FnBody 下，因此直接在 FnBody 中判断即可。
+        let itr = nodes.iter();
+        for n in itr {
             let eids = self.children_ids(n);
 
             (l, is_over) = match self.node_data(&eids[0]) {
@@ -2111,7 +2100,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 same_type(&r, &l) {
                 r = l;
             } else {
-                return Err(format!("返回类型冲突"));
+                return Err(format!("返回类型冲突。应返回：{:?}，实际返回：{:?}", r, l));
             }
 
             if is_over {
@@ -2216,7 +2205,7 @@ mod llvmir_gen_tests {
 
     use crate::{semantic::llvmir_gen::same_type, syntax::{ASTNode, ll_parser::RecursiveDescentParser, NT}, lex::{Tokens, analysis::Analysis, preprocessor::preprocessor}, table::symbol::SymbolManager};
 
-    use super::{post_traversal_retain_and_skipsubtree, IrGen, TyType, VType};
+    use super::{post_traversal_retain_and_skipsubtree, IrGen};
 
     macro_rules! llvmir_gen_test_macro {
         ($file:expr, $test:expr, $retT:ty, $ret:expr, $funcN:expr) => {

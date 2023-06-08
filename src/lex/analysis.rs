@@ -1,5 +1,3 @@
-use lazy_static::__Deref;
-
 use crate::mistakes::show::Mis;
 use crate::mistakes::show::Types;
 use crate::mistakes::show::{Froms, LineType};

@@ -1,7 +1,5 @@
 //! LL1 递归下降分析
 
-use std::fmt::{Debug, Display};
-
 use id_tree::{Node, NodeId};
 use id_tree::InsertBehavior::AsRoot;
 use id_tree::InsertBehavior::UnderNode;
@@ -16,13 +14,13 @@ use super::{ASTNode};
 
 macro_rules! insert_t {
     ($tree: expr, $root: expr, $tok: expr) => {
-        $tree.insert(Node::new(ASTNode::T($tok)), UnderNode(&$root)).unwrap();
+        $tree.insert(Node::new(ASTNode::T($tok)), UnderNode(&$root)).unwrap()
     };
 }
 
 macro_rules! insert_nt {
     ($tree: expr, $root: expr, $type: expr) => {
-        $tree.insert(Node::new(ASTNode::NT($type)), UnderNode(&$root)).unwrap();
+        $tree.insert(Node::new(ASTNode::NT($type)), UnderNode(&$root)).unwrap()
     };
 }
 
