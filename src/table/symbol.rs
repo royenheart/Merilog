@@ -1,6 +1,6 @@
 //! 符号表
 
-use std::{collections::HashMap, borrow::BorrowMut};
+use std::collections::HashMap;
 use id_tree::{Tree, Node, NodeId};
 
 /// 符号表：符号名（对于值，是引用该值的量名；对于类型，是类型名） -> vec<内情量>，vec 用于隐藏机制

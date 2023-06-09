@@ -396,6 +396,8 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                         .unwrap()
                         .fn_type(&args_meta_type, false);
                     let func_v = self.module.add_function(fn_name.as_str(), func_type, None);
+                    // 将函数自身加入符号表，类型就是函数类型本身
+                    self.push_identi_values(fn_name, VType::new(Some(func_v.as_any_value_enum()), Some(new_env.clone()), HasType::Type(func_ret), false), env);
                     // 对函数创建新的基本块
                     let basicb = self.context.append_basic_block(func_v, "func_basic_b");
                     // 跳转至新函数体的基本块进行语句的构建
@@ -416,8 +418,6 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                     // 开始在新的作用域和第一个基本块下分析函数体 FnBody，还不用考虑跳转块
                     let need_default_ret = func_ret == AnyTypeEnum::StructType(self.get_void_type());
                     let (r, _) = self.resolv_fn_body(&id, &new_env, None, &func_v, None, need_default_ret)?;
-                    // 将函数自身加入符号表，类型就是函数类型本身
-                    self.push_identi_values(fn_name, VType::new(Some(func_v.as_any_value_enum()), Some(new_env), HasType::Type(func_ret), false), env);
                     // FnBody 分析完毕，返回其返回类型，检查类型是否与函数返回类型一致
                     match same_type(&func_ret, &r) {
                         true => (),
@@ -692,7 +692,6 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         let mut nums: Vec<AnyValueEnum> = vec![];
         // _ 不能直接参加运算
         // 由于排除了 ExecMatch / ExecVar / ExecExp 继续遍历下去的可能，这三个符号交由对应的函数处理即可，括号内是 ExecExp，因此可以忽略掉括号
-        // 需要进行除0判断？
         let mut itr = nodes.iter().enumerate();
         while let Some((index, n)) = itr.next() {
             // 栈操作，获取当前符号
@@ -832,7 +831,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             // 对顶层符号进行操作，使用 gen_op
             if let Some(x) = top {
                 // 不断迭代直至栈为空，或者当前符号优先级高于栈顶
-                while !ops.is_empty() && judge_left_gt_right_priority(ops.last().unwrap(), x) {
+                while !ops.is_empty() && judge_left_gt_right_priority(ops.last().unwrap(), x) && nums.len() > 1 {
                     let op = ops.pop().unwrap();
                     if let (Some(rhs), Some(lhs)) = (nums.pop(), nums.pop()) {
                         let pr = self.gen_op(lhs, op, Some(rhs), func)?;
@@ -845,7 +844,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             }
         }
         // 最后清空栈
-        while !ops.is_empty() {
+        while !ops.is_empty() && nums.len() > 1 {
             let op = ops.pop().unwrap();
             if let (Some(rhs), Some(lhs)) = (nums.pop(), nums.pop()) {
                 let pr = self.gen_op(lhs, op, Some(rhs), func)?;
@@ -1371,7 +1370,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                     // 首先创建 switch 跳转语句，为此需要先提前解析出每个 exp，创建各个需要的作用域、基本块
                     // 然后针对每个基本块，解析各个 FnBody
                     // 为每一个 FnBody 创建一个新作用域
-                    let new_env = self.symbols.create_env(root);
+                    let new_env = self.symbols.create_env(env);
                     let new_block = self.context.append_basic_block(*func, "switch_block");
                     // 先进行解析
                     let exp_v = self.resolv_exec_exp(&n, env, func)?;
@@ -1395,6 +1394,8 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             self.builder.position_at_end(new_b);
             // 不允许使用 break 跳出 match
             self.resolv_fn_body(&funcn, &new_env, None, func, Some(&result), false)?;
+            // 每个 switch 跳回 jump_block
+            self.builder.build_unconditional_branch(jump_block);
         }
         self.builder.position_at_end(jump_block);
         let result_value = self.builder.build_load(match_ty, result, "match_load_result");
@@ -1420,7 +1421,6 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             |x| !matches!(x, ASTNode::NT(NT::ExecExp) | ASTNode::NT(NT::FnBody)),
             |x| matches!(x, ASTNode::NT(NT::ExecExp) | ASTNode::NT(NT::FnBody)),
         );
-        // 条件判断语句中的判断的返回类型必须是 LLVM IR 中的 IntValue，Bool 基本类型相当于是一个 IntValue
         // If 的条件判断语句仍然处于给定的当前作用域中（因此符号也是当前作用域的）
         let merge_block = self.context.append_basic_block(*func, "merge_block");
         let mut ret = AnyTypeEnum::StructType(self.get_void_type());
@@ -1433,6 +1433,10 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 ASTNode::NT(NT::ExecExp) => {
                     let fn_node = itr.next().unwrap().1;
                     let j = self.resolv_exec_exp(n, env, func)?;
+                    // 先判断是否可作为判断条件
+                    if !j.is_int_value() {
+                        return Err(format!("if 分支条件必须为 IntValue，当前条件：{:?}", j));
+                    }
                     let new_env = self.symbols.create_env(env);
                     let new_block = self.context.append_basic_block(*func, "elif_block");
                     let jump_block = self.context.append_basic_block(*func, "next_else_control_block");
@@ -1518,6 +1522,10 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         self.builder.position_at_end(exp_block);
         // 每次都需要重新计算一次
         let exp = self.resolv_exec_exp(&ids[0], env, func)?;
+        // 先判断是否可作为判断条件
+        if !exp.is_int_value() {
+            return Err(format!("while 判断条件必须为 IntValue，当前条件：{:?}", exp));
+        }
         self.builder.build_conditional_branch(exp.into_int_value(), while_block, jump_block);
         self.builder.position_at_end(while_block);
         // 返回值
@@ -1559,6 +1567,10 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         self.builder.position_at_end(exp_block);
         // 每次计算一遍
         let exp = self.resolv_exec_exp(&ids[1], env, func)?;
+        // 先判断是否可作为判断条件
+        if !exp.is_int_value() {
+            return Err(format!("loop 判断条件必须为 IntValue，当前条件：{:?}", exp));
+        }
         self.builder.position_at_end(exp_block);
         self.builder.build_conditional_branch(exp.into_int_value(), loop_block, jump_block);
         self.builder.position_at_end(jump_block);
@@ -2445,5 +2457,35 @@ mod llvmir_gen_tests {
     #[test]
     fn test14() {
         llvmir_gen_test_macro!("s31.ms", true, i32, None, "main");
+    }
+
+    #[test]
+    fn test15() {
+        llvmir_gen_test_macro!("s32.ms", true, i32, Some(5), "main");
+    }
+
+    #[test]
+    fn test16() {
+        llvmir_gen_test_macro!("s33.ms", true, i32, Some(6), "main");
+    }
+
+    #[test]
+    fn test17() {
+        llvmir_gen_test_macro!("s34.ms", false, i32, None, "main");
+    }
+
+    #[test]
+    fn test18() {
+        llvmir_gen_test_macro!("s35.ms", false, i32, None, "main");
+    }
+
+    #[test]
+    fn test19() {
+        llvmir_gen_test_macro!("s36.ms", false, i32, None, "main");
+    }
+
+    #[test]
+    fn test20() {
+        llvmir_gen_test_macro!("s37.ms", true, i32, Some(6), "main");
     }
 }
