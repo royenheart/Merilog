@@ -26,8 +26,13 @@ fn main() {
     path.push("examples/tests/lex_struct.png");
     let mut ctx = PrinterContext::default();
     ctx.always_inline();
-    exec(s, &mut ctx, vec![
-        CommandArg::Format(Format::Png),
-        CommandArg::Output(path.to_str().unwrap().to_string())
-    ]).unwrap();
+    exec(
+        s,
+        &mut ctx,
+        vec![
+            CommandArg::Format(Format::Png),
+            CommandArg::Output(path.to_str().unwrap().to_string()),
+        ],
+    )
+    .unwrap();
 }

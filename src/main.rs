@@ -4,16 +4,16 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
+use id_tree_layout::Layouter;
+use inkwell::context::Context;
 use Merilog::lex::analysis::Analysis;
 use Merilog::lex::preprocessor::preprocessor;
 use Merilog::semantic::llvmir_gen::IrGen;
 use Merilog::syntax::ll_parser::RecursiveDescentParser;
 use Merilog::table::symbol::SymbolManager;
-use id_tree_layout::Layouter;
-use inkwell::context::Context;
 
 pub const VERSION: &str = "0.1.0";
-pub const ARGS_PAT: &str = "[-h] [-v] [ -P | -Preprocess ] [ -L | --Lex ] [ -S | -Syntax [--Visual <vi_output>]] [-I | --IR] [-o <output>] <input>"; 
+pub const ARGS_PAT: &str = "[-h] [-v] [ -P | -Preprocess ] [ -L | --Lex ] [ -S | -Syntax [--Visual <vi_output>]] [-I | --IR] [-o <output>] <input>";
 
 fn usage() {
     println!("Merilog use method: {}", ARGS_PAT);
@@ -35,7 +35,7 @@ fn main() {
     let mut help = false;
     let mut i = 1;
     while i < args.len() {
-        match args[i].as_str() {         
+        match args[i].as_str() {
             "-h" => {
                 help = true;
                 break;
@@ -46,13 +46,13 @@ fn main() {
             }
             "-L" | "--Lex" => {
                 print_lex = true;
-            },
+            }
             "-P" | "--Preprocess" => {
                 print_preprocess = true;
-            },
+            }
             "-S" | "--Syntax" => {
                 print_syntax = true;
-            },
+            }
             "-I" | "--IR" => {
                 print_ir = true;
             }
@@ -72,7 +72,7 @@ fn main() {
                     usage();
                     return;
                 }
-            },
+            }
             "-o" => {
                 if i + 1 < args.len() {
                     output = args[i + 1].clone();
@@ -111,7 +111,7 @@ fn main() {
     if output.is_empty() {
         output = input.clone();
     }
-    let file =  match std::fs::File::open(&input) {
+    let file = match std::fs::File::open(&input) {
         Ok(f) => f,
         Err(e) => {
             println!("source file \"{}\" open failed!: {}", &input, e);
@@ -172,7 +172,11 @@ fn main() {
                 return;
             }
         };
-        parser.get_tokens().clone().into_iter().for_each(|x| ft_lex.write_all(format!("{}\n", x.dump()).as_bytes()).unwrap());
+        parser.get_tokens().clone().into_iter().for_each(|x| {
+            ft_lex
+                .write_all(format!("{}\n", x.dump()).as_bytes())
+                .unwrap()
+        });
     }
     if print_syntax {
         let mut o = output.clone();
@@ -186,7 +190,9 @@ fn main() {
         };
         match parse_ok {
             true => {
-                ft_syntax.write_all(format!("{}\n", parser.dump()).as_bytes()).unwrap();
+                ft_syntax
+                    .write_all(format!("{}\n", parser.dump()).as_bytes())
+                    .unwrap();
                 if visualize {
                     let t = parser.get_ast();
                     Layouter::new(t)
@@ -194,7 +200,7 @@ fn main() {
                         .write()
                         .expect("Failed to write to file");
                 }
-            },
+            }
             false => {
                 println!("Syntax analysis failed!");
             }

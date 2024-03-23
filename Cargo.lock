@@ -12,6 +12,7 @@ dependencies = [
  "inkwell",
  "lazy_static",
  "llvm-sys",
+ "proc-macro2",
 ]
 
 [[package]]
@@ -87,15 +88,6 @@ dependencies = [
 
 [[package]]
 name = "dot-generator"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "322e00783838d540a6288c25ae085983750521fb8cca82fc653eb2457c369565"
-dependencies = [
- "dot-structures",
-]
-
-[[package]]
-name = "dot-generator"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0aaac7ada45f71873ebce336491d1c1bc4a7c8042c7cea978168ad59e805b871"
@@ -105,9 +97,9 @@ dependencies = [
 
 [[package]]
 name = "dot-structures"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "545da7d6df7f8fd0de7106669a7d0bfa3dbcfa24d81da46906ad658188b2ff7c"
+checksum = "675e35c02a51bb4d4618cb4885b3839ce6d1787c97b664474d9208d074742e20"
 
 [[package]]
 name = "either"
@@ -168,11 +160,11 @@ dependencies = [
 
 [[package]]
 name = "graphviz-rust"
-version = "0.6.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06d2e1afca2ae5a9887b57f991e89c9078e4150fc8875cc2b0babf4bdb3ec720"
+checksum = "bc1ec243771bd8dfe7f9a2e75e28d17c66fc3901b2182c5e0eeff067623aef32"
 dependencies = [
- "dot-generator 0.2.0",
+ "dot-generator",
  "dot-structures",
  "into-attr",
  "into-attr-derive",
@@ -246,20 +238,20 @@ dependencies = [
 
 [[package]]
 name = "into-attr"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6ec0dd848c05d2695dd73818984fb156ac8cbcbfdf4e474243590bfcc2468e9"
+checksum = "18b48c537e49a709e678caec3753a7dba6854661a1eaa27675024283b3f8b376"
 dependencies = [
  "dot-structures",
 ]
 
 [[package]]
 name = "into-attr-derive"
-version = "0.1.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b88c3c684271aa7810934ae69a0b904c59f478cb551f3f388cc1c384f0c3145"
+checksum = "ecac7c1ae6cd2c6a3a64d1061a8bdc7f52ff62c26a831a2301e54c1b5d70d5b1"
 dependencies = [
- "dot-generator 0.1.0",
+ "dot-generator",
  "dot-structures",
  "into-attr",
  "quote",
@@ -411,9 +403,9 @@ checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.56"
+version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b63bdb0cd06f1f4dedf69b254734f9b45af66e4a031e42a7480257d9898b435"
+checksum = "e835ff2298f5721608eb1a980ecaee1aef2c132bf95ecc026a11b7bf3c01c02e"
 dependencies = [
  "unicode-ident",
 ]

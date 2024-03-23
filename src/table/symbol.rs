@@ -1,7 +1,7 @@
 //! 符号表
 
+use id_tree::{Node, NodeId, Tree};
 use std::collections::HashMap;
-use id_tree::{Tree, Node, NodeId};
 
 /// 符号表：符号名（对于值，是引用该值的量名；对于类型，是类型名） -> vec<内情量>，vec 用于隐藏机制
 /// 符号得选取源代码中的符号
@@ -10,14 +10,18 @@ type SymbolTable<V> = HashMap<String, Vec<V>>;
 pub struct NameSpace<Ty, V> {
     types: SymbolTable<Ty>,
     values: SymbolTable<V>,
-    aliases: HashMap<String, String>
+    aliases: HashMap<String, String>,
 }
 /// 作用域
 type SymbolTree<Ty, V> = Tree<NameSpace<Ty, V>>;
 
 impl<Ty, V> NameSpace<Ty, V> {
     pub fn new() -> Self {
-        Self { types: SymbolTable::new(), values: SymbolTable::new(), aliases: HashMap::new() }
+        Self {
+            types: SymbolTable::new(),
+            values: SymbolTable::new(),
+            aliases: HashMap::new(),
+        }
     }
 
     fn types_key(&self, symbol: &str) -> Option<String> {
@@ -41,14 +45,14 @@ impl<Ty, V> NameSpace<Ty, V> {
     fn types_contains(&self, symbol: &str) -> Option<&Ty> {
         match self.types_key(symbol) {
             Some(s) => self.types.get(s.as_str()).unwrap().last(),
-            None => None
+            None => None,
         }
     }
 
     fn types_contains_mut(&mut self, symbol: &str) -> Option<&mut Ty> {
         match self.types_key(symbol) {
             Some(s) => self.types.get_mut(s.as_str()).unwrap().last_mut(),
-            None => None
+            None => None,
         }
     }
 
@@ -62,23 +66,21 @@ impl<Ty, V> NameSpace<Ty, V> {
         let s = symbol.trim();
         match self.values.contains_key(s) {
             false => None,
-            true => {
-                Some(s.to_string())
-            }
+            true => Some(s.to_string()),
         }
     }
 
     fn values_contains(&self, symbol: &str) -> Option<&V> {
         match self.values_key(symbol) {
             Some(s) => self.values.get(s.as_str()).unwrap().last(),
-            None => None
+            None => None,
         }
     }
 
     fn values_contains_mut(&mut self, symbol: &str) -> Option<&mut V> {
         match self.values_key(symbol) {
             Some(s) => self.values.get_mut(s.as_str()).unwrap().last_mut(),
-            None => None
+            None => None,
         }
     }
 
@@ -109,7 +111,7 @@ impl<Ty, V> NameSpace<Ty, V> {
 }
 
 pub struct SymbolManager<Ty, V> {
-    symbols: SymbolTree<Ty, V>
+    symbols: SymbolTree<Ty, V>,
 }
 
 /// 不直接区分类型、变量
@@ -124,9 +126,7 @@ impl<Ty, V> SymbolManager<Ty, V> {
         let mut tree = SymbolTree::new();
         let root = Node::new(NameSpace::new());
         tree.insert(root, id_tree::InsertBehavior::AsRoot).unwrap();
-        SymbolManager {
-            symbols: tree
-        }
+        SymbolManager { symbols: tree }
     }
 
     /// 返回符号表
@@ -143,7 +143,7 @@ impl<Ty, V> SymbolManager<Ty, V> {
     pub fn root_env(&self) -> NodeId {
         self.symbols.root_node_id().unwrap().clone()
     }
-    
+
     /// 只查看当前作用域的类型命名空间是否存在该符号，若存在，返回其值
     pub fn looknow_types(&self, symbol: &str, child: &NodeId) -> Option<&Ty> {
         if let Ok(node) = self.symbols.get(child) {
@@ -169,7 +169,7 @@ impl<Ty, V> SymbolManager<Ty, V> {
             let t = node.data();
             return t.values_contains(symbol);
         }
-        
+
         None
     }
 
@@ -178,7 +178,7 @@ impl<Ty, V> SymbolManager<Ty, V> {
             let t = node.data_mut();
             return t.values_contains_mut(symbol);
         }
-        
+
         None
     }
 
@@ -200,7 +200,7 @@ impl<Ty, V> SymbolManager<Ty, V> {
         let liter = vec![self.symbols.get(child).unwrap()];
         let riter = self.symbols.ancestors(child).unwrap();
         let iter = liter.into_iter().chain(riter.into_iter());
-        
+
         for node in iter {
             let t = node.data();
             let tr = t.types_contains(symbol);
@@ -230,7 +230,7 @@ impl<Ty, V> SymbolManager<Ty, V> {
         let liter = vec![self.symbols.get(child).unwrap()];
         let riter = self.symbols.ancestors(child).unwrap();
         let iter = liter.into_iter().chain(riter.into_iter());
-        
+
         for node in iter {
             let t = node.data();
             let tr = t.values_contains(symbol);
@@ -250,7 +250,9 @@ impl<Ty, V> SymbolManager<Ty, V> {
     /// 在指定作用域下创建新的子作用域
     pub fn create_env(&mut self, root: &NodeId) -> NodeId {
         let child = Node::new(NameSpace::new());
-        self.symbols.insert(child, id_tree::InsertBehavior::UnderNode(root)).unwrap()
+        self.symbols
+            .insert(child, id_tree::InsertBehavior::UnderNode(root))
+            .unwrap()
     }
 
     /// 消除指定作用域中的所有符号

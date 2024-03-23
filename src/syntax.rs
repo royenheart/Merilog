@@ -20,14 +20,14 @@
 
 pub mod ll_parser;
 
-use std::{hash::Hash, fmt::Debug};
+use std::{fmt::Debug, hash::Hash};
 
 use id_tree::Tree;
 use id_tree_layout::Visualize;
 
 use crate::lex::Tokens;
 
-/* 
+/*
 
 开始符号为 Merilog
 源文件以结构体声明、函数为基本单位
@@ -71,7 +71,7 @@ DefineVarE -> Tokens::Comma DefineVarS | Tokens::Null
 
 First(DefineVar) = {Tokens::let}
 First(DefineVarMutable) = {Tokens::mut, Tokens::Identity}
-First(DefineVarS) = {Tokens::Identity} 
+First(DefineVarS) = {Tokens::Identity}
 First(DefineVarType) = {Tokens::Semicolon， Tokens::Null}
 First(DefineVarValue) = {Tokens::Is, Tokens::Null}
 First(DefineVarE) = {Tokens::Comma, Tokens::Null}
@@ -438,7 +438,7 @@ pub enum NT {
     FnParams,
     FnParamsE,
     FnReturn,
-    FnBody
+    FnBody,
 }
 
 /// 抽象语法树结点
@@ -447,21 +447,21 @@ pub enum ASTNode {
     /// 终结符
     T(Tokens),
     /// 非终结符
-    NT(NT)
+    NT(NT),
 }
 
 impl Visualize for ASTNode {
     fn visualize(&self) -> String {
         match self {
             ASTNode::T(t) => format!("{:?}", t),
-            ASTNode::NT(nt) => format!("{:?}", nt)
+            ASTNode::NT(nt) => format!("{:?}", nt),
         }
     }
 
     fn emphasize(&self) -> bool {
         match self {
             ASTNode::T(_) => true,
-            ASTNode::NT(_) => false
+            ASTNode::NT(_) => false,
         }
     }
 }

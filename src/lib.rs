@@ -1,6 +1,6 @@
-pub mod lex;
-pub mod syntax;
-pub mod mistakes;
-pub mod table;
-pub mod semantic;
 pub mod extern_feature;
+pub mod lex;
+pub mod mistakes;
+pub mod semantic;
+pub mod syntax;
+pub mod table;

@@ -1,4 +1,11 @@
-use inkwell::{context::Context, module::Module, AddressSpace, values::{PointerValue, AnyValueEnum, ArrayValue, FunctionValue, BasicValue, AnyValue}, builder::Builder, types::{VoidType, IntType, AnyTypeEnum, ArrayType, BasicMetadataTypeEnum}};
+use inkwell::{
+    builder::Builder,
+    context::Context,
+    module::Module,
+    types::{AnyTypeEnum, ArrayType, BasicMetadataTypeEnum, IntType, VoidType},
+    values::{AnyValue, AnyValueEnum, ArrayValue, BasicValue, FunctionValue, PointerValue},
+    AddressSpace,
+};
 
 fn main() {
     let context = Context::create();
@@ -17,9 +24,15 @@ struct test_llvm_ir_example<'a, 'ctx> {
 }
 
 impl<'a, 'ctx> test_llvm_ir_example<'a, 'ctx> {
-    fn new(context: &'ctx Context, builder: &'a Builder<'ctx>, module: &'a Module<'ctx>) -> test_llvm_ir_example<'a, 'ctx> {
+    fn new(
+        context: &'ctx Context,
+        builder: &'a Builder<'ctx>,
+        module: &'a Module<'ctx>,
+    ) -> test_llvm_ir_example<'a, 'ctx> {
         test_llvm_ir_example {
-            context, builder, module
+            context,
+            builder,
+            module,
         }
     }
 
@@ -38,11 +51,11 @@ impl<'a, 'ctx> test_llvm_ir_example<'a, 'ctx> {
         let func1 = self.module.add_function("test_struct", func1_type, None);
         // let func2 = self.module.add_function("fun2", func2_type, None);
         // let block1 = self.context.append_basic_block(func1, "test_struct");
-        
+
         // self.builder.position_at_end(block1);
         // self.emit_printf_call("Hello World\n", "block1print", &printf_func);
         // self.emit_struct();
-        
+
         // let block2 = self.context.append_basic_block(func1, "2");
         // let c = self.builder.build_unconditional_branch(block2);
         // self.builder.position_at_end(block2);
@@ -107,7 +120,7 @@ impl<'a, 'ctx> test_llvm_ir_example<'a, 'ctx> {
         // let result = self.builder.build_phi(i1_type, "or_result");
         // result.add_incoming(&[(&true_result, true_block), (&false_result, false_block)]);
 
-        // let arrr = self.context.i32_type().array_type(4).const_zero();    
+        // let arrr = self.context.i32_type().array_type(4).const_zero();
         // println!("{:?}", arrr.get_name());
         // println!("{:?}", arrr.get_type().get_element_type());
 
@@ -169,7 +182,7 @@ impl<'a, 'ctx> test_llvm_ir_example<'a, 'ctx> {
         // }
 
         // self.builder.build_return(Some(&i32_type.const_int(0, false)));
-    
+
         // let func2_b = self.context.append_basic_block(func2, "func2_b");
         // self.builder.position_at_end(func2_b);
         // 从符号表中获取 Type ，然后可以得到
@@ -188,7 +201,7 @@ impl<'a, 'ctx> test_llvm_ir_example<'a, 'ctx> {
         // 可以看到，我们已经获取到了下一步符号的 PointerValue（内部元素 PointerValue 指向），下一步符号的类型（内部元素的类型），可以进行迭代了
         // 在第 3 步，便可以根据此时的引用符号和原符号类型看是否合法引用，非法引用将无法继续
         // 在第 3 步，若此时没有其他引用符号，若进行过函数调用或者当前就是 FuncValue（当前是就先调用一次，得到返回值替换当前原符号 PointValue 的值），只返回原符号 PointValue 的值，无引用；若没有函数调用过且当前不是 FuncValue，返回当前的原符号的 PointValue 和 原符号 PointValue 的值。
-        // 最后还需要根据 vt 和 vp 获取一下 
+        // 最后还需要根据 vt 和 vp 获取一下
 
         // self.emit_printf_call(&format!("Iam Func2, receive pi: {:?}\nreceive pi_0: {:?}", pi.print_to_string(), pi_0.print_to_string()), "func2callprint", &printf_func);
         // self.builder.build_return(Some(&i32_type.const_int(0, false)));
@@ -196,15 +209,9 @@ impl<'a, 'ctx> test_llvm_ir_example<'a, 'ctx> {
         let l = self.context.bool_type().const_zero();
         let r = self.context.bool_type().const_zero();
         let i1_type: IntType = self.context.bool_type();
-        let true_block = self
-            .context
-            .append_basic_block(func1, "true_block");
-        let false_block = self
-            .context
-            .append_basic_block(func1, "false_block");
-        let merge_block = self
-            .context
-            .append_basic_block(func1, "merge_block");
+        let true_block = self.context.append_basic_block(func1, "true_block");
+        let false_block = self.context.append_basic_block(func1, "false_block");
+        let merge_block = self.context.append_basic_block(func1, "merge_block");
         self.builder
             .build_conditional_branch(l, true_block, false_block);
 
@@ -228,19 +235,23 @@ impl<'a, 'ctx> test_llvm_ir_example<'a, 'ctx> {
     }
 
     fn jit_execute(&self) {
-        match (self.module.verify(), self.module.create_jit_execution_engine(inkwell::OptimizationLevel::None)) {
+        match (
+            self.module.verify(),
+            self.module
+                .create_jit_execution_engine(inkwell::OptimizationLevel::None),
+        ) {
             (Ok(_), Ok(engine)) => {
-                if let Ok(f) = unsafe {
-                    engine.get_function::<unsafe extern "C" fn() -> i32>("test_struct")
-                } {
+                if let Ok(f) =
+                    unsafe { engine.get_function::<unsafe extern "C" fn() -> i32>("test_struct") }
+                {
                     unsafe {
                         f.call();
                     }
                 }
-            },
+            }
             (Err(x), _) => {
                 println!("{}", x);
-            },
+            }
             (_, Err(x)) => {
                 println!("{}", x);
             }
@@ -264,11 +275,13 @@ impl<'a, 'ctx> test_llvm_ir_example<'a, 'ctx> {
         // 模仿引用解析，首先需要针对变量，获取引用
         let vp = arr_v.into_pointer_value();
         // println!("{:?}", vp.get_type());
-        
+
         // 接下来解析数组，首先获取值
-        let vv = self.builder.build_load(arr_type, vp, "get_arr_v_point_value");
+        let vv = self
+            .builder
+            .build_load(arr_type, vp, "get_arr_v_point_value");
         // 对于数组，将其
-        
+
         // let mut arr_i_ptr1 = unsafe { self.builder.build_gep(struct_type, arr_v_e, &[i1.into()], "load_arr_1_ptr") };
         // let mut arr_i_ptr2 = unsafe { self.builder.build_gep(struct_type, arr_v_e, &[i2.into()], "load_arr_2_ptr") };
         // let mut arr_i_v1 = self.builder.build_load(, ptr, name)
@@ -278,18 +291,21 @@ impl<'a, 'ctx> test_llvm_ir_example<'a, 'ctx> {
         // let pointer_value = self.emit_global_string(hello_str, name);
         // let hstr = self.context.const_string(hello_str.as_bytes(), false);
         let hstr_ptr = self.builder.build_global_string_ptr(hello_str, &name);
-        let c = self.builder.build_call(*func, &[hstr_ptr.as_pointer_value().into()], name);
+        let c = self
+            .builder
+            .build_call(*func, &[hstr_ptr.as_pointer_value().into()], name);
         // println!("{:?}", c.as_any_value_enum());
         // println!("{:?}", c.get_called_fn_value());
- 
         self.context.i32_type()
     }
 
     fn emit_struct(&self) {
-        let s = self.context.struct_type(&[
-            self.context.i32_type().into()
-        ], false);
-        let v = self.module.add_global(s, Some(AddressSpace::default()), "test_struct");
+        let s = self
+            .context
+            .struct_type(&[self.context.i32_type().into()], false);
+        let v = self
+            .module
+            .add_global(s, Some(AddressSpace::default()), "test_struct");
         v.set_initializer(&s.const_zero());
         v.set_linkage(inkwell::module::Linkage::Internal);
         // println!("struct any value enum: {:?}", v.as_any_value_enum());
@@ -300,14 +316,16 @@ impl<'a, 'ctx> test_llvm_ir_example<'a, 'ctx> {
 
     fn emit_global_string(&self, strs: &str, name: &str) -> PointerValue<'a> {
         let ty = self.context.i8_type().array_type(strs.len() as u32);
-        let gv = self.module.add_global(ty, Some(AddressSpace::default()), name);
+        let gv = self
+            .module
+            .add_global(ty, Some(AddressSpace::default()), name);
         gv.set_linkage(inkwell::module::Linkage::Internal);
         gv.set_initializer(&self.context.const_string(strs.as_ref(), false));
 
         let pointer_value = self.builder.build_pointer_cast(
             gv.as_pointer_value(),
             self.context.i8_type().ptr_type(AddressSpace::default()),
-            name
+            name,
         );
 
         pointer_value

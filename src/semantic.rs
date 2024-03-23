@@ -13,9 +13,9 @@ Merilog -> DefineFn Merilog
 Merilog -> Tokens::Null
 
 DefineStruct -> Tokens::Identity DefineStructBody
-DefineStructBody -> Tokens::Identity ExecType DefineStructBodyNext 
+DefineStructBody -> Tokens::Identity ExecType DefineStructBodyNext
 DefineStructBody -> DefineFn DefineStructBodyNext
-DefineStructBodyNext -> DefineStructBody 
+DefineStructBodyNext -> DefineStructBody
 DefineStructBodyNext -> Tokens::Null
 
 DefineVar -> DefineVarMutable
@@ -24,9 +24,9 @@ DefineVarMutable -> DefineVarS
 DefineVarS -> Tokens::Identity DefineVarType DefineVarValue DefineVarE
 DefineVarType -> Tokens::Null
 DefineVarType -> ExecType
-DefineVarValue -> Tokens::Null 
+DefineVarValue -> Tokens::Null
 DefineVarValue -> ExecExp
-DefineVarE -> DefineVarS 
+DefineVarE -> DefineVarS
 DefineVarE -> Tokens::Null
 
 ExecSentence -> ExecStmt
@@ -41,10 +41,10 @@ ExecExp -> ExecExpAndS R1
 R1 -> Tokens::OrS ExecExp R1
 R1 -> Tokens::Null
 ExecExpAndS -> ExecExpOr R2
-R2 -> Tokens::AndS ExecExpAndS R2 
+R2 -> Tokens::AndS ExecExpAndS R2
 R2 -> Tokens::Null
 ExecExpOr -> ExecExpAnd R3
-R3 -> Tokens::Or ExpecExpOr R3 
+R3 -> Tokens::Or ExpecExpOr R3
 R3 -> Tokens::Null
 ExecExpAnd -> ExecExpEq R4
 R4 -> Tokens::And ExecExpAnd R4
@@ -60,27 +60,27 @@ ExecExpAddOp -> ExecExpMultiOp R7
 R7 -> AddOps ExecExpAddOp R7
 R7 -> Tokens::Null
 ExecExpMultiOp -> ExecExpSigOp R8
-R8 -> MultiOps ExecExpMultiOp R8 
+R8 -> MultiOps ExecExpMultiOp R8
 R8 -> Tokens::Null
 ExecExpSigOp -> SigOps ExecExpN
 ExecExpN -> Ops
 ExecExpN -> Tokens::LeftC ExecExp Tokens::RightC
 Eqs -> Tokens::Eq
 Eqs -> Tokens::Ne
-LGqs -> Tokens::Gt 
+LGqs -> Tokens::Gt
 LGqs -> Tokens::Lt
 LGqs -> Tokens::Ge
 LGqs -> Tokens::Le
-AddOps -> Tokens::Plus 
+AddOps -> Tokens::Plus
 AddOps -> Tokens::Minus
-MultiOps -> Tokens::Mul 
+MultiOps -> Tokens::Mul
 MultiOps -> Tokens::Div
 MultiOps -> Tokens::Mod
-SigOps -> Tokens::Negate 
+SigOps -> Tokens::Negate
 SigOps -> Tokens::Plus
 SigOps -> Tokens::Minus
 SigOps -> Tokens::Null
-Ops -> Tokens::Str 
+Ops -> Tokens::Str
 Ops -> Tokens::Int
 Ops -> Tokens::Decimal
 Ops -> Tokens::Bool
@@ -94,7 +94,7 @@ ExecRet -> ExecExp
 ExecBreak -> Tokens::Break
 
 ExecIS -> ExecVar ExecIsW ExecExp
-ExecIsW -> Tokens::PlusIs 
+ExecIsW -> Tokens::PlusIs
 ExecIsW -> Tokens::MinusIs
 ExecIsW -> Tokens::DivIs
 ExecIsW -> Tokens::MulIs
@@ -109,7 +109,7 @@ ExecMatchE -> Tokens::Null
 ExecIf -> ExecExp FnBody ExecIfE
 ExecIfE -> Tokens::Else ExecIfEi FnBody ExecIfE
 ExecIfE -> Tokens::Null
-ExecIfEi -> Tokens::If ExecExp 
+ExecIfEi -> Tokens::If ExecExp
 ExecIfEi -> Tokens::Null
 
 ExecWhile -> ExecExp FnBody
@@ -120,7 +120,7 @@ ExecLoop -> FnBody ExecExp
 
 ExecVar -> Tokens::Identity ExecVarT
 - - 数组引用
-ExecVarT -> Tokens::LeftMB Tokens::Int Tokens::RightMB ExecVarT 
+ExecVarT -> Tokens::LeftMB Tokens::Int Tokens::RightMB ExecVarT
 - - 元组、结构体引用
 ExecVarT -> Tokens::ShouldReturn ExecVarSoE ExecVarT
 - - 直接变量引用

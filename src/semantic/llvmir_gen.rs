@@ -32,9 +32,7 @@
 // 由于基本类型判断还缺少很多类型，bool 的 i1type 等需要转换成能识别的（i1 type 必须转换成 i32 type 才能继续使用），需要继续完善
 // gen_op 可以有很多种情况，迫于时间问题就不一一实现了（做得到）
 
-use std::{
-    path::Path, collections::HashMap, borrow::Borrow,
-};
+use std::{borrow::Borrow, collections::HashMap, path::Path};
 
 use id_tree::NodeId;
 use id_tree_layout::Visualize;
@@ -44,9 +42,10 @@ use inkwell::{
     context::Context,
     execution_engine::ExecutionEngine,
     module::Module,
-    types::{AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, StructType, AnyType},
+    types::{AnyType, AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, StructType},
     values::{
-        AnyValue, AnyValueEnum, BasicValue, BasicValueEnum, FunctionValue, InstructionValue, PointerValue, StructValue, BasicMetadataValueEnum,
+        AnyValue, AnyValueEnum, BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue,
+        InstructionValue, PointerValue, StructValue,
     },
     AddressSpace, OptimizationLevel,
 };
@@ -77,10 +76,12 @@ fn post_traversal_retain_and_skipsubtree(
         }
     }
     ret.push(root.clone());
-    ret.into_iter().filter(|x| {
-        let inner_data = tree.get(x).unwrap().data();
-        !retain_func(inner_data)
-    }).collect()
+    ret.into_iter()
+        .filter(|x| {
+            let inner_data = tree.get(x).unwrap().data();
+            !retain_func(inner_data)
+        })
+        .collect()
 }
 
 fn into_basic_value(any_value: AnyValueEnum) -> Result<BasicValueEnum, String> {
@@ -91,7 +92,10 @@ fn into_basic_value(any_value: AnyValueEnum) -> Result<BasicValueEnum, String> {
         AnyValueEnum::PointerValue(v) => Ok(v.into()),
         AnyValueEnum::StructValue(v) => Ok(v.into()),
         AnyValueEnum::VectorValue(v) => Ok(v.into()),
-        _ => Err(format!("无法转换 AnyValueEnum 至 BasicValueEnum：{:?}", any_value)),
+        _ => Err(format!(
+            "无法转换 AnyValueEnum 至 BasicValueEnum：{:?}",
+            any_value
+        )),
     }
 }
 
@@ -103,7 +107,10 @@ fn into_basic_type(any_type: AnyTypeEnum) -> Result<BasicTypeEnum, String> {
         AnyTypeEnum::PointerType(v) => Ok(v.into()),
         AnyTypeEnum::StructType(v) => Ok(v.into()),
         AnyTypeEnum::VectorType(v) => Ok(v.into()),
-        _ => Err(format!("无法转换 AnyTypeEnum 至 BasicTypeEnum：{:?}", any_type)),
+        _ => Err(format!(
+            "无法转换 AnyTypeEnum 至 BasicTypeEnum：{:?}",
+            any_type
+        )),
     }
 }
 
@@ -115,7 +122,10 @@ fn into_basic_metadata_type(any_type: AnyTypeEnum) -> Result<BasicMetadataTypeEn
         AnyTypeEnum::PointerType(v) => Ok(v.into()),
         AnyTypeEnum::StructType(v) => Ok(v.into()),
         AnyTypeEnum::VectorType(v) => Ok(v.into()),
-        _ => Err(format!("无法转换 AnyTypeEnum 至 BasicMetadataTypeEnum：{:?}", any_type)),
+        _ => Err(format!(
+            "无法转换 AnyTypeEnum 至 BasicMetadataTypeEnum：{:?}",
+            any_type
+        )),
     }
 }
 
@@ -127,7 +137,10 @@ fn into_basic_metadata_value(any_value: AnyValueEnum) -> Result<BasicMetadataVal
         AnyValueEnum::PointerValue(v) => Ok(v.into()),
         AnyValueEnum::StructValue(v) => Ok(v.into()),
         AnyValueEnum::VectorValue(v) => Ok(v.into()),
-        _ => Err(format!("无法转换 AnyValueEnum 至 BasicMetadataValueEnum：{:?}", any_value)),
+        _ => Err(format!(
+            "无法转换 AnyValueEnum 至 BasicMetadataValueEnum：{:?}",
+            any_value
+        )),
     }
 }
 
@@ -141,7 +154,7 @@ fn same_type(me: &AnyTypeEnum, other: &AnyTypeEnum) -> bool {
 // 即是否是 Tokens::Str Tokens::Int Tokens::Decimal Tokens::Bool ExecMatach ExecVar ExecExp
 // (忽略括号)
 // + 单目其实是 + +v，- 单目其实是 + -v，而 ! 单目直接进行运算
-lazy_static!{
+lazy_static! {
     static ref TOK_PRIORITIES: HashMap<String, u8> = {
         let mut r = HashMap::new();
         r.insert(ASTNode::T(Tokens::LeftC).visualize(), 1);
@@ -176,7 +189,7 @@ fn judge_left_gt_right_priority(left: &ASTNode, right: &ASTNode) -> bool {
 #[derive(Debug, Clone)]
 pub enum HasType<'a> {
     Type(AnyTypeEnum<'a>),
-    None(InstructionValue<'a>)
+    None(InstructionValue<'a>),
 }
 
 #[derive(Debug)]
@@ -184,12 +197,22 @@ pub struct VType<'a> {
     value: Option<AnyValueEnum<'a>>,
     has_env: Option<NodeId>,
     has_type: HasType<'a>,
-    is_mut: bool
+    is_mut: bool,
 }
 
 impl<'a> VType<'a> {
-    fn new(value: Option<AnyValueEnum<'a>>, has_env: Option<NodeId>, has_type: HasType<'a>, is_mut: bool) -> Self {
-        Self { value, has_env, has_type, is_mut }
+    fn new(
+        value: Option<AnyValueEnum<'a>>,
+        has_env: Option<NodeId>,
+        has_type: HasType<'a>,
+        is_mut: bool,
+    ) -> Self {
+        Self {
+            value,
+            has_env,
+            has_type,
+            is_mut,
+        }
     }
 }
 
@@ -197,12 +220,16 @@ impl<'a> VType<'a> {
 pub struct TyType<'a> {
     type_value: AnyTypeEnum<'a>,
     params: Vec<&'a str>,
-    has_env: Option<NodeId>
+    has_env: Option<NodeId>,
 }
 
 impl<'a> TyType<'a> {
     fn new(type_value: AnyTypeEnum<'a>, params: Vec<&'a str>, has_env: Option<NodeId>) -> Self {
-        Self { type_value, params, has_env }
+        Self {
+            type_value,
+            params,
+            has_env,
+        }
     }
 }
 
@@ -213,15 +240,18 @@ pub struct IrGen<'a, 'ctx> {
     builder: Builder<'ctx>,
     /// 类型符号表： \
     /// 值符号表：AnyValueEnum 表示具体值（可进行反填），NodeId 表示值下所属的作用域，str 为类型（可进行反填），bool 表示是否可变（true 为可变，false 为不可变）
-    symbols: &'ctx mut SymbolManager<TyType<'a>, VType<'a>>
+    symbols: &'ctx mut SymbolManager<TyType<'a>, VType<'a>>,
 }
 
-impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
+impl<'a, 'ctx> IrGen<'a, 'ctx>
+where
+    'ctx: 'a,
+{
     pub fn new(
         ast: &'ctx AST,
         context: &'ctx Context,
         symbols: &'ctx mut SymbolManager<TyType<'a>, VType<'a>>,
-        module_name: &str
+        module_name: &str,
     ) -> IrGen<'a, 'ctx> {
         let module = context.create_module(module_name);
         let builder = context.create_builder();
@@ -230,7 +260,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             context,
             module,
             builder,
-            symbols
+            symbols,
         }
     }
 
@@ -264,13 +294,9 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
     ) -> Result<RetT, String> {
         match (self.module.verify(), self.jit_engine(optimization_level)) {
             (Ok(_), Ok(engine)) => {
-                match unsafe {engine.get_function::<unsafe extern "C" fn() -> RetT>(func_name)} {
-                    Ok(f) => unsafe {
-                        Ok(f.call())
-                    },
-                    Err(e) => {
-                        Err(e.to_string())
-                    }
+                match unsafe { engine.get_function::<unsafe extern "C" fn() -> RetT>(func_name) } {
+                    Ok(f) => unsafe { Ok(f.call()) },
+                    Err(e) => Err(e.to_string()),
                 }
             }
             (Err(x), _) => Err(format!("Static Analysis Failed: {}", x)),
@@ -283,9 +309,22 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         let i32_type = self.context.i32_type();
         let str_type = self.context.i8_type().ptr_type(AddressSpace::default());
         let printf_type = i32_type.fn_type(&[str_type.into()], true);
-        let printf_func = self.module.add_function("puts", printf_type, Some(inkwell::module::Linkage::External));
+        let printf_func = self.module.add_function(
+            "puts",
+            printf_type,
+            Some(inkwell::module::Linkage::External),
+        );
         let printf_func_v = printf_func.as_any_value_enum();
-        self.push_identi_values("puts", VType::new(Some(printf_func_v), None, HasType::Type(printf_type.as_any_type_enum()), false), env);
+        self.push_identi_values(
+            "puts",
+            VType::new(
+                Some(printf_func_v),
+                None,
+                HasType::Type(printf_type.as_any_type_enum()),
+                false,
+            ),
+            env,
+        );
     }
 
     /// Generate LLVM IR Code
@@ -304,7 +343,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
     pub fn verify(&self) -> Result<(), String> {
         match self.module.verify() {
             Ok(_) => Ok(()),
-            Err(x) => Err(x.to_string())
+            Err(x) => Err(x.to_string()),
         }
     }
 
@@ -365,7 +404,12 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                     let params_nodes = post_traversal_retain_and_skipsubtree(
                         self.ast,
                         &id,
-                        |x| !matches!(x, ASTNode::T(Tokens::Identity(_)) | ASTNode::NT(NT::ExecType)),
+                        |x| {
+                            !matches!(
+                                x,
+                                ASTNode::T(Tokens::Identity(_)) | ASTNode::NT(NT::ExecType)
+                            )
+                        },
                         |x| matches!(x, ASTNode::NT(NT::ExecType)),
                     );
                     let mut itr = params_nodes.into_iter();
@@ -397,7 +441,16 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                         .fn_type(&args_meta_type, false);
                     let func_v = self.module.add_function(fn_name.as_str(), func_type, None);
                     // 将函数自身加入符号表，类型就是函数类型本身
-                    self.push_identi_values(fn_name, VType::new(Some(func_v.as_any_value_enum()), Some(new_env.clone()), HasType::Type(func_ret), false), env);
+                    self.push_identi_values(
+                        fn_name,
+                        VType::new(
+                            Some(func_v.as_any_value_enum()),
+                            Some(new_env.clone()),
+                            HasType::Type(func_ret),
+                            false,
+                        ),
+                        env,
+                    );
                     // 对函数创建新的基本块
                     let basicb = self.context.append_basic_block(func_v, "func_basic_b");
                     // 跳转至新函数体的基本块进行语句的构建
@@ -405,24 +458,37 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                     // 2023.6.6，使用传值进行函数调用，还不支持传指针。
                     // 2023.6.6，由于使用传值，而又要构造符号，因此需要在函数开头构造语句，构建对应的符号（指针），存储传入的值
                     for (index, va) in func_v.get_param_iter().enumerate() {
-                        let va = va;
-                        let ps = self.builder.build_alloca(into_basic_type(args_type[index]).unwrap(), "load_func_p");
-                        self.builder.build_store(ps, va);
+                        let vb = va;
+                        let ps = self.builder.build_alloca(
+                            into_basic_type(args_type[index]).unwrap(),
+                            "load_func_p",
+                        );
+                        self.builder.build_store(ps, vb);
                         self.push_identi_values(
                             args_name[index],
                             // 2023.6.4，默认参数不可变，由于文法不能在函数定义时指定类型为可变
-                            VType::new(Some(ps.as_any_value_enum()), None, HasType::Type(args_type[index]), false),
+                            VType::new(
+                                Some(ps.as_any_value_enum()),
+                                None,
+                                HasType::Type(args_type[index]),
+                                false,
+                            ),
                             &new_env,
                         );
                     }
                     // 开始在新的作用域和第一个基本块下分析函数体 FnBody，还不用考虑跳转块
-                    let need_default_ret = func_ret == AnyTypeEnum::StructType(self.get_void_type());
-                    let (r, _) = self.resolv_fn_body(&id, &new_env, None, &func_v, None, need_default_ret)?;
+                    let need_default_ret =
+                        func_ret == AnyTypeEnum::StructType(self.get_void_type());
+                    let (r, _) =
+                        self.resolv_fn_body(&id, &new_env, None, &func_v, None, need_default_ret)?;
                     // FnBody 分析完毕，返回其返回类型，检查类型是否与函数返回类型一致
                     match same_type(&func_ret, &r) {
                         true => (),
                         false => {
-                            return Err(format!("函数返回类型: {:?} 和函数体返回类型: {:?} 不一致", func_ret, r));
+                            return Err(format!(
+                                "函数返回类型: {:?} 和函数体返回类型: {:?} 不一致",
+                                func_ret, r
+                            ));
                         }
                     }
 
@@ -469,17 +535,19 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             self.ast,
             &ids[1],
             |x| {
-                !matches!(x,
-                    ASTNode::T(Tokens::Identity(_)) | 
-                    ASTNode::NT(NT::ExecType) | 
-                    ASTNode::NT(NT::DefineFn)
+                !matches!(
+                    x,
+                    ASTNode::T(Tokens::Identity(_))
+                        | ASTNode::NT(NT::ExecType)
+                        | ASTNode::NT(NT::DefineFn)
                 )
             },
             |x| {
-                matches!(x,
-                    ASTNode::T(Tokens::Identity(_)) | 
-                    ASTNode::NT(NT::ExecType) | 
-                    ASTNode::NT(NT::DefineFn)
+                matches!(
+                    x,
+                    ASTNode::T(Tokens::Identity(_))
+                        | ASTNode::NT(NT::ExecType)
+                        | ASTNode::NT(NT::DefineFn)
                 )
             },
         );
@@ -493,7 +561,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                     match identis.contains(&identi.as_str()) {
                         true => {
                             return Err("结构体内不能同时定义相同的多个字段".to_string());
-                        },
+                        }
                         false => {
                             // 下标就代表偏移量
                             identis.push(identi.as_str());
@@ -518,7 +586,11 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         let struct_t_n = struct_type.to_string();
         self.push_identi_type(
             struct_name,
-            TyType::new(AnyTypeEnum::StructType(struct_type), identis, Some(new_env.clone())),
+            TyType::new(
+                AnyTypeEnum::StructType(struct_type),
+                identis,
+                Some(new_env.clone()),
+            ),
             env,
         );
         // 创建别名
@@ -527,18 +599,40 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         // 2023.6.6，默认构造传值函数而不是传指针。
         let constructor_params: &[BasicMetadataTypeEnum] = args_type_func.as_slice();
         let constructor_type = struct_type.fn_type(constructor_params, false);
-        let constructor = self.module.add_function(struct_name.as_str(), constructor_type, None);
-        let constructor_b = self.context.append_basic_block(constructor, struct_name.as_str());
+        let constructor = self
+            .module
+            .add_function(struct_name.as_str(), constructor_type, None);
+        let constructor_b = self
+            .context
+            .append_basic_block(constructor, struct_name.as_str());
         self.builder.position_at_end(constructor_b);
         let struct_init_ptr = self.builder.build_alloca(struct_type, "init_struct_value");
         for (i, p) in constructor.get_param_iter().enumerate() {
-            let param_ptr = unsafe { self.builder.build_gep(p.get_type(), struct_init_ptr, &[self.context.i32_type().const_int(i as u64, false)], "ptr_struct_v") };
+            let param_ptr = unsafe {
+                self.builder.build_gep(
+                    p.get_type(),
+                    struct_init_ptr,
+                    &[self.context.i32_type().const_int(i as u64, false)],
+                    "ptr_struct_v",
+                )
+            };
             self.builder.build_store(param_ptr, p);
         }
-        let struct_init_value = self.builder.build_load(struct_type, struct_init_ptr, "load_struct_value");
+        let struct_init_value =
+            self.builder
+                .build_load(struct_type, struct_init_ptr, "load_struct_value");
         self.builder.build_return(Some(&struct_init_value));
         // 2023.6.7，将构造函数加入 env 中，不添加至 new_env 了
-        self.push_identi_values(struct_name, VType::new(Some(constructor.as_any_value_enum()), None, HasType::Type(AnyTypeEnum::StructType(struct_type)), false), env);
+        self.push_identi_values(
+            struct_name,
+            VType::new(
+                Some(constructor.as_any_value_enum()),
+                None,
+                HasType::Type(AnyTypeEnum::StructType(struct_type)),
+                false,
+            ),
+            env,
+        );
         // 接下来解析结构体其他函数，加入 new_env 中
         for func in funcs {
             // 在结构体的作用域内解析函数
@@ -562,15 +656,23 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
     /// 此时不注册新类型，但是要注册新的变量
     /// 类型判断可以通过 LLVM IR 进行检测，不用自行检测
     /// 需要特判 _ 和 self，self 不能直接赋值，左部若为 _，只解析右边的 ExecExp 即可。由于左部是 Identity，所以不可能遇到 _() 这种情况
-    fn def_var(&mut self, root: &NodeId, env: &NodeId, func: &FunctionValue) -> Result<AnyTypeEnum<'ctx>, String> {
+    fn def_var(
+        &mut self,
+        root: &NodeId,
+        env: &NodeId,
+        func: &FunctionValue,
+    ) -> Result<AnyTypeEnum<'ctx>, String> {
         // ExecStmt - DefineVar
         let nodes = post_traversal_retain_and_skipsubtree(
             self.ast,
             root,
             |x| {
-                !matches!(x,
-                    ASTNode::T(Tokens::Mut) | ASTNode::T(Tokens::Identity(_)) | 
-                    ASTNode::NT(NT::ExecType) | ASTNode::NT(NT::ExecExp)
+                !matches!(
+                    x,
+                    ASTNode::T(Tokens::Mut)
+                        | ASTNode::T(Tokens::Identity(_))
+                        | ASTNode::NT(NT::ExecType)
+                        | ASTNode::NT(NT::ExecExp)
                 )
             },
             |x| matches!(x, ASTNode::NT(NT::ExecType) | ASTNode::NT(NT::ExecExp)),
@@ -583,7 +685,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             match self.node_data(&n) {
                 ASTNode::T(Tokens::Mut) => {
                     is_mutable = true;
-                },
+                }
                 ASTNode::T(Tokens::Identity(identi)) if identi.eq("self") => {
                     return Err(format!("self 为特殊保留符号，不能被重新定义"));
                 }
@@ -597,11 +699,11 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 ASTNode::NT(NT::ExecType) => {
                     let t = self.resolv_exec_type(&n, env)?;
                     identis[iden_index as usize].1 = Some(t);
-                },
+                }
                 ASTNode::NT(NT::ExecExp) => {
                     let e = self.resolv_exec_exp(&n, env, func)?;
                     identis[iden_index as usize].2 = Some(e);
-                },
+                }
                 other => {
                     unreachable!("不可能变量声明，遇到符号：{:?}", other)
                 }
@@ -620,26 +722,63 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                     let instr = self.builder.build_unconditional_branch(next_b);
                     self.builder.position_at_end(next_b);
                     // 先加入符号表，后续再进行修改
-                    self.push_identi_values(name, VType::new(None, None, HasType::None(instr), is_mutable), env);
-                },
+                    self.push_identi_values(
+                        name,
+                        VType::new(None, None, HasType::None(instr), is_mutable),
+                        env,
+                    );
+                }
                 (Some(name), None, Some(exp)) => {
                     let t = exp.get_type();
-                    let v = self.builder.build_alloca(into_basic_type(t).unwrap(), name.as_str());
+                    let v = self
+                        .builder
+                        .build_alloca(into_basic_type(t).unwrap(), name.as_str());
                     self.builder.build_store(v, into_basic_value(exp).unwrap());
-                    self.push_identi_values(name, VType::new(Some(v.as_any_value_enum()), None, HasType::Type(t), is_mutable), env);
-                },
+                    self.push_identi_values(
+                        name,
+                        VType::new(
+                            Some(v.as_any_value_enum()),
+                            None,
+                            HasType::Type(t),
+                            is_mutable,
+                        ),
+                        env,
+                    );
+                }
                 (Some(name), Some(t), None) => {
-                    let v = self.builder.build_alloca(into_basic_type(t).unwrap(), name.as_str());
-                    self.push_identi_values(name, VType::new(Some(v.as_any_value_enum()), None, HasType::Type(t), is_mutable), env);
-                },
+                    let v = self
+                        .builder
+                        .build_alloca(into_basic_type(t).unwrap(), name.as_str());
+                    self.push_identi_values(
+                        name,
+                        VType::new(
+                            Some(v.as_any_value_enum()),
+                            None,
+                            HasType::Type(t),
+                            is_mutable,
+                        ),
+                        env,
+                    );
+                }
                 (Some(name), Some(t), Some(exp)) => {
-                    let v = self.builder.build_alloca(into_basic_type(t).unwrap(), name.as_str());
+                    let v = self
+                        .builder
+                        .build_alloca(into_basic_type(t).unwrap(), name.as_str());
                     self.builder.build_store(v, into_basic_value(exp).unwrap());
-                    self.push_identi_values(name, VType::new(Some(v.as_any_value_enum()), None, HasType::Type(t), is_mutable), env);
-                },
+                    self.push_identi_values(
+                        name,
+                        VType::new(
+                            Some(v.as_any_value_enum()),
+                            None,
+                            HasType::Type(t),
+                            is_mutable,
+                        ),
+                        env,
+                    );
+                }
                 (None, Some(_t), _) => {
                     return Err(format!("_ 不能被声明类型"));
-                },
+                }
                 // 左部 _ ，exp 已经解析过
                 (None, None, Some(_exp)) => (),
                 (n, t, e) => {
@@ -656,37 +795,60 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
     /// 后序遍历是中缀表达式
     /// 返回表达式类型和类型名称
     /// （这一块放在语法分析即搞一个语法制导翻译方案会更好，不需要再次遍历一遍计算运算关系和顺序。。。，目前为了方便修改先分离出来）
-    fn resolv_exec_exp(&mut self, root: &NodeId, env: &NodeId, func: &FunctionValue) -> Result<AnyValueEnum<'ctx>, String> {
+    fn resolv_exec_exp(
+        &mut self,
+        root: &NodeId,
+        env: &NodeId,
+        func: &FunctionValue,
+    ) -> Result<AnyValueEnum<'ctx>, String> {
         // 不包含自身，否则会无限递归爆栈
         let exp_childs = self.children_ids(root);
-        let nodes: Vec<NodeId> = exp_childs.into_iter().flat_map(|r| {post_traversal_retain_and_skipsubtree(
-            self.ast,
-            &r,
-            |x| {
-                !matches!(x,
-                    ASTNode::T(Tokens::OrS) | ASTNode::T(Tokens::AndS) | 
-                    ASTNode::T(Tokens::Or) | ASTNode::T(Tokens::And) | 
-                    ASTNode::T(Tokens::Eq) | ASTNode::T(Tokens::Ne) | 
-                    ASTNode::T(Tokens::Gt) | ASTNode::T(Tokens::Lt) | 
-                    ASTNode::T(Tokens::Ge) | ASTNode::T(Tokens::Le) | 
-                    ASTNode::T(Tokens::Plus) | ASTNode::T(Tokens::Minus) | 
-                    ASTNode::T(Tokens::Mul) | ASTNode::T(Tokens::Div) | 
-                    ASTNode::T(Tokens::Mod) | ASTNode::T(Tokens::Negate) | 
-                    ASTNode::T(Tokens::Str(_)) | ASTNode::T(Tokens::Int(_)) | 
-                    ASTNode::T(Tokens::Decimal(_)) | ASTNode::T(Tokens::Bool(_)) | 
-                    ASTNode::NT(NT::ExecMatch) | ASTNode::NT(NT::ExecVar) | 
-                    ASTNode::NT(NT::ExecExp)
+        let nodes: Vec<NodeId> = exp_childs
+            .into_iter()
+            .flat_map(|r| {
+                post_traversal_retain_and_skipsubtree(
+                    self.ast,
+                    &r,
+                    |x| {
+                        !matches!(
+                            x,
+                            ASTNode::T(Tokens::OrS)
+                                | ASTNode::T(Tokens::AndS)
+                                | ASTNode::T(Tokens::Or)
+                                | ASTNode::T(Tokens::And)
+                                | ASTNode::T(Tokens::Eq)
+                                | ASTNode::T(Tokens::Ne)
+                                | ASTNode::T(Tokens::Gt)
+                                | ASTNode::T(Tokens::Lt)
+                                | ASTNode::T(Tokens::Ge)
+                                | ASTNode::T(Tokens::Le)
+                                | ASTNode::T(Tokens::Plus)
+                                | ASTNode::T(Tokens::Minus)
+                                | ASTNode::T(Tokens::Mul)
+                                | ASTNode::T(Tokens::Div)
+                                | ASTNode::T(Tokens::Mod)
+                                | ASTNode::T(Tokens::Negate)
+                                | ASTNode::T(Tokens::Str(_))
+                                | ASTNode::T(Tokens::Int(_))
+                                | ASTNode::T(Tokens::Decimal(_))
+                                | ASTNode::T(Tokens::Bool(_))
+                                | ASTNode::NT(NT::ExecMatch)
+                                | ASTNode::NT(NT::ExecVar)
+                                | ASTNode::NT(NT::ExecExp)
+                        )
+                    },
+                    |x| {
+                        // 不对其子树进行遍历
+                        matches!(
+                            x,
+                            ASTNode::NT(NT::ExecMatch)
+                                | ASTNode::NT(NT::ExecVar)
+                                | ASTNode::NT(NT::ExecExp)
+                        )
+                    },
                 )
-            },
-            |x| {
-                // 不对其子树进行遍历
-                matches!(x,
-                    ASTNode::NT(NT::ExecMatch) | 
-                    ASTNode::NT(NT::ExecVar) | 
-                    ASTNode::NT(NT::ExecExp)
-                )
-            },
-        )}).collect();
+            })
+            .collect();
         // 定义栈，处理运算顺序（运算符号优先级等）
         let mut ops: Vec<&ASTNode> = vec![];
         let mut nums: Vec<AnyValueEnum> = vec![];
@@ -697,20 +859,26 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             // 栈操作，获取当前符号
             let judge_n = self.node_data(n);
             let top = match judge_n {
-                ASTNode::T(Tokens::OrS) | ASTNode::T(Tokens::AndS) |
-                ASTNode::T(Tokens::Or) | ASTNode::T(Tokens::And) |
-                ASTNode::T(Tokens::Eq) | ASTNode::T(Tokens::Ne) |
-                ASTNode::T(Tokens::Gt) | ASTNode::T(Tokens::Lt) |
-                ASTNode::T(Tokens::Ge) | ASTNode::T(Tokens::Le) | 
-                ASTNode::T(Tokens::Mul) | ASTNode::T(Tokens::Div) |
-                ASTNode::T(Tokens::Mod) => {Some(judge_n)}
+                ASTNode::T(Tokens::OrS)
+                | ASTNode::T(Tokens::AndS)
+                | ASTNode::T(Tokens::Or)
+                | ASTNode::T(Tokens::And)
+                | ASTNode::T(Tokens::Eq)
+                | ASTNode::T(Tokens::Ne)
+                | ASTNode::T(Tokens::Gt)
+                | ASTNode::T(Tokens::Lt)
+                | ASTNode::T(Tokens::Ge)
+                | ASTNode::T(Tokens::Le)
+                | ASTNode::T(Tokens::Mul)
+                | ASTNode::T(Tokens::Div)
+                | ASTNode::T(Tokens::Mod) => Some(judge_n),
                 ASTNode::T(Tokens::Plus) => {
                     let d = self.node_data(&nodes[index + 1]);
                     match d {
-                        ASTNode::T(Tokens::Str(_)) |
-                        ASTNode::T(Tokens::Int(_)) |
-                        ASTNode::T(Tokens::Decimal(_)) |
-                        ASTNode::T(Tokens::Bool(_)) => {
+                        ASTNode::T(Tokens::Str(_))
+                        | ASTNode::T(Tokens::Int(_))
+                        | ASTNode::T(Tokens::Decimal(_))
+                        | ASTNode::T(Tokens::Bool(_)) => {
                             nums.push(self.basic_value(d)?);
                             itr.next();
                             Some(judge_n)
@@ -721,7 +889,11 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                             Some(judge_n)
                         }
                         ASTNode::NT(NT::ExecVar) => {
-                            nums.push(self.resolv_exec_var(&nodes[index + 1], env, func)?.1.unwrap());
+                            nums.push(
+                                self.resolv_exec_var(&nodes[index + 1], env, func)?
+                                    .1
+                                    .unwrap(),
+                            );
                             itr.next();
                             Some(judge_n)
                         }
@@ -729,17 +901,17 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                             nums.push(self.resolv_exec_exp(&nodes[index + 1], env, func)?);
                             itr.next();
                             Some(judge_n)
-                        },
-                        _ => Some(judge_n)
+                        }
+                        _ => Some(judge_n),
                     }
                 }
                 ASTNode::T(Tokens::Minus) => {
                     let d = self.node_data(&nodes[index + 1]);
                     match d {
-                        ASTNode::T(Tokens::Str(_)) |
-                        ASTNode::T(Tokens::Int(_)) |
-                        ASTNode::T(Tokens::Decimal(_)) |
-                        ASTNode::T(Tokens::Bool(_)) => {
+                        ASTNode::T(Tokens::Str(_))
+                        | ASTNode::T(Tokens::Int(_))
+                        | ASTNode::T(Tokens::Decimal(_))
+                        | ASTNode::T(Tokens::Bool(_)) => {
                             let pr = self.basic_value(d)?;
                             nums.push(self.gen_op(pr, judge_n, None, func)?);
                             itr.next();
@@ -752,7 +924,10 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                             Some(&ASTNode::T(Tokens::Plus))
                         }
                         ASTNode::NT(NT::ExecVar) => {
-                            let pr = self.resolv_exec_var(&nodes[index + 1], env, func)?.1.unwrap();
+                            let pr = self
+                                .resolv_exec_var(&nodes[index + 1], env, func)?
+                                .1
+                                .unwrap();
                             nums.push(self.gen_op(pr, judge_n, None, func)?);
                             itr.next();
                             Some(&ASTNode::T(Tokens::Plus))
@@ -762,8 +937,8 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                             nums.push(self.gen_op(pr, judge_n, None, func)?);
                             itr.next();
                             Some(&ASTNode::T(Tokens::Plus))
-                        },
-                        _ => Some(judge_n)
+                        }
+                        _ => Some(judge_n),
                     }
                 }
                 ASTNode::T(Tokens::Negate) => {
@@ -771,10 +946,10 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                     let noden = itr.next().unwrap().1;
                     let d = self.node_data(noden);
                     match d {
-                        ASTNode::T(Tokens::Str(_)) |
-                        ASTNode::T(Tokens::Int(_)) |
-                        ASTNode::T(Tokens::Decimal(_)) |
-                        ASTNode::T(Tokens::Bool(_)) => {
+                        ASTNode::T(Tokens::Str(_))
+                        | ASTNode::T(Tokens::Int(_))
+                        | ASTNode::T(Tokens::Decimal(_))
+                        | ASTNode::T(Tokens::Bool(_)) => {
                             let pr = self.basic_value(d)?;
                             nums.push(self.gen_op(pr, judge_n, None, func)?);
                             None
@@ -793,14 +968,14 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                             let pr = self.resolv_exec_exp(noden, env, func)?;
                             nums.push(self.gen_op(pr, judge_n, None, func)?);
                             None
-                        },
-                        _ => return Err(format!("语法分析：单目运算符 ! 解析出错"))
+                        }
+                        _ => return Err(format!("语法分析：单目运算符 ! 解析出错")),
                     }
                 }
-                ASTNode::T(Tokens::Str(_)) |
-                ASTNode::T(Tokens::Int(_)) |
-                ASTNode::T(Tokens::Decimal(_)) |
-                ASTNode::T(Tokens::Bool(_)) => {
+                ASTNode::T(Tokens::Str(_))
+                | ASTNode::T(Tokens::Int(_))
+                | ASTNode::T(Tokens::Decimal(_))
+                | ASTNode::T(Tokens::Bool(_)) => {
                     nums.push(self.basic_value(judge_n)?);
                     None
                 }
@@ -812,10 +987,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                     // 只取具体值，此时判断是否返回了 _
                     let r = self.resolv_exec_var(n, env, func)?;
                     nums.push(match r {
-                        (Some(_), Some(_), _, Some(_)) |
-                        (None, Some(_), _, None) => {
-                            r.1.unwrap()
-                        },
+                        (Some(_), Some(_), _, Some(_)) | (None, Some(_), _, None) => r.1.unwrap(),
                         (_, _, _, _) => {
                             return Err(format!("符号不能参与计算：{:?}", r));
                         }
@@ -831,7 +1003,10 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             // 对顶层符号进行操作，使用 gen_op
             if let Some(x) = top {
                 // 不断迭代直至栈为空，或者当前符号优先级高于栈顶
-                while !ops.is_empty() && judge_left_gt_right_priority(ops.last().unwrap(), x) && nums.len() > 1 {
+                while !ops.is_empty()
+                    && judge_left_gt_right_priority(ops.last().unwrap(), x)
+                    && nums.len() > 1
+                {
                     let op = ops.pop().unwrap();
                     if let (Some(rhs), Some(lhs)) = (nums.pop(), nums.pop()) {
                         let pr = self.gen_op(lhs, op, Some(rhs), func)?;
@@ -907,9 +1082,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 let ret = self.builder.build_float_neg(l, "fneg");
                 Ok(AnyValueEnum::FloatValue(ret))
             }
-            (o1, o2, None) => {
-                Err(format!("lhs: {:?}, op: {:?} 无法进行单目运算", o1, o2))
-            }
+            (o1, o2, None) => Err(format!("lhs: {:?}, op: {:?} 无法进行单目运算", o1, o2)),
             (
                 AnyValueEnum::IntValue(l),
                 ASTNode::T(Tokens::OrS),
@@ -920,15 +1093,9 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 let i32_type = self.context.i32_type();
                 let l = self.builder.build_int_truncate(l, i1_type, "int_negate");
                 let r = self.builder.build_int_truncate(r, i1_type, "int_negate");
-                let true_block = self
-                    .context
-                    .append_basic_block(*func, "true_block");
-                let false_block = self
-                    .context
-                    .append_basic_block(*func, "false_block");
-                let merge_block = self
-                    .context
-                    .append_basic_block(*func, "merge_block");
+                let true_block = self.context.append_basic_block(*func, "true_block");
+                let false_block = self.context.append_basic_block(*func, "false_block");
+                let merge_block = self.context.append_basic_block(*func, "merge_block");
                 self.builder
                     .build_conditional_branch(l, true_block, false_block);
 
@@ -946,7 +1113,10 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 result.add_incoming(&[(&true_result, true_block), (&false_result, false_block)]);
 
                 let ret = result.as_any_value_enum();
-                let ret = self.builder.build_int_z_extend(ret.into_int_value(), i32_type, "i1_to_i32").as_any_value_enum();
+                let ret = self
+                    .builder
+                    .build_int_z_extend(ret.into_int_value(), i32_type, "i1_to_i32")
+                    .as_any_value_enum();
                 Ok(ret)
             }
             (
@@ -968,15 +1138,9 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 let i32_type = self.context.i32_type();
                 let l = self.builder.build_int_truncate(l, i1_type, "int_negate");
                 let r = self.builder.build_int_truncate(r, i1_type, "int_negate");
-                let true_block = self
-                    .context
-                    .append_basic_block(*func, "true_block");
-                let false_block = self
-                    .context
-                    .append_basic_block(*func, "false_block");
-                let merge_block = self
-                    .context
-                    .append_basic_block(*func, "merge_block");
+                let true_block = self.context.append_basic_block(*func, "true_block");
+                let false_block = self.context.append_basic_block(*func, "false_block");
+                let merge_block = self.context.append_basic_block(*func, "merge_block");
                 self.builder
                     .build_conditional_branch(l, true_block, false_block);
 
@@ -994,7 +1158,10 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 result.add_incoming(&[(&result_true, true_block), (&result_false, false_block)]);
 
                 let ret = result.as_any_value_enum();
-                let ret = self.builder.build_int_z_extend(ret.into_int_value(), i32_type, "i1_to_i32").as_any_value_enum();
+                let ret = self
+                    .builder
+                    .build_int_z_extend(ret.into_int_value(), i32_type, "i1_to_i32")
+                    .as_any_value_enum();
                 Ok(ret)
             }
             (
@@ -1210,9 +1377,10 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 let ret = self.builder.build_float_rem(l, r, "intmod");
                 Ok(AnyValueEnum::FloatValue(ret))
             }
-            (o1, o2, o3) => {
-                Err(format!("lhs: {:?}, rhs: {:?}, op: {:?} 目前无法直接进行运算", o1, o3, o2))
-            }
+            (o1, o2, o3) => Err(format!(
+                "lhs: {:?}, rhs: {:?}, op: {:?} 目前无法直接进行运算",
+                o1, o3, o2
+            )),
         }
     }
 
@@ -1227,27 +1395,25 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         &mut self,
         root: &NodeId,
         env: &NodeId,
-        func: &FunctionValue
+        func: &FunctionValue,
     ) -> Result<AnyTypeEnum<'ctx>, String> {
         let ids = self.children_ids(root);
 
-        let (var_point, var_value, is_mut, auto_type) = match self.resolv_exec_var(&ids[0], env, func)? {
-            (None, Some(vv), _, None) => {
-                (None, Some(vv), false, None)
-            },
-            (Some(vp), Some(vv), is_mut, Some(auto_type)) => {
-                (Some(vp), Some(vv), is_mut, Some(auto_type))
-            },
-            (Some(vp), Some(vv), _, None) => {
-                (Some(vp), Some(vv), false, None)
-            },
-            (None, None, _, Some(auto_type)) => {
-                (None, None, true, Some(auto_type))
-            },
-            (vp, vv, is_mut, auto_type) => {
-                return Err(format!("非左值：{:?} {:?} {:?} {:?}", vp, vv, is_mut, auto_type));
-            }
-        };
+        let (var_point, var_value, is_mut, auto_type) =
+            match self.resolv_exec_var(&ids[0], env, func)? {
+                (None, Some(vv), _, None) => (None, Some(vv), false, None),
+                (Some(vp), Some(vv), is_mut, Some(auto_type)) => {
+                    (Some(vp), Some(vv), is_mut, Some(auto_type))
+                }
+                (Some(vp), Some(vv), _, None) => (Some(vp), Some(vv), false, None),
+                (None, None, _, Some(auto_type)) => (None, None, true, Some(auto_type)),
+                (vp, vv, is_mut, auto_type) => {
+                    return Err(format!(
+                        "非左值：{:?} {:?} {:?} {:?}",
+                        vp, vv, is_mut, auto_type
+                    ));
+                }
+            };
         let op = self.node_data(&self.children_ids(&ids[1])[0]);
 
         match (op, is_mut, auto_type, var_point, var_value) {
@@ -1261,7 +1427,9 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 let exp = self.resolv_exec_exp(&ids[2], env, func)?;
                 let init_t = exp.get_type();
 
-                let latec = self.builder.build_alloca(into_basic_type(init_t).unwrap(), "late_init");
+                let latec = self
+                    .builder
+                    .build_alloca(into_basic_type(init_t).unwrap(), "late_init");
                 self.builder.position_at_end(next_b);
                 self.builder.build_store(
                     latec.as_any_value_enum().into_pointer_value(),
@@ -1270,66 +1438,106 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 // 修改符号表
                 // var_vt.has_type = HasType::Type(init_t.to_string());
                 // var_vt.value = Some(latec.as_any_value_enum());
-            },
+            }
             (_, _, None, None, Some(x)) => {
-                return Err(format!("无引用的常量值或函数调用等产生的值：{:?}，无法被赋值", x))
-            },
+                return Err(format!(
+                    "无引用的常量值或函数调用等产生的值：{:?}，无法被赋值",
+                    x
+                ))
+            }
             (ASTNode::T(Tokens::Is), _, None, Some(_), Some(_)) => {
                 // 遇上 _ ，只构建右表达式（函数使用等）
                 self.resolv_exec_exp(&ids[2], env, func)?;
             }
             (o1, _, None, Some(_), Some(_)) => {
-                return Err(format!("_ 无法用于 = 以外的赋值表达式，当前运算符号为：{:?}", o1));
-            },
-            (ASTNode::T(Tokens::PlusIs), true, Some(HasType::Type(_)), Some(var_point), Some(var_value)) => {
+                return Err(format!(
+                    "_ 无法用于 = 以外的赋值表达式，当前运算符号为：{:?}",
+                    o1
+                ));
+            }
+            (
+                ASTNode::T(Tokens::PlusIs),
+                true,
+                Some(HasType::Type(_)),
+                Some(var_point),
+                Some(var_value),
+            ) => {
                 let exp = self.resolv_exec_exp(&ids[2], env, func)?;
                 let new_exp = self.gen_op(var_value, &ASTNode::T(Tokens::Plus), Some(exp), func)?;
                 self.builder.build_store(
                     var_point.into_pointer_value(),
                     into_basic_value(new_exp).unwrap(),
                 );
-            },
-            (ASTNode::T(Tokens::MinusIs), true, Some(HasType::Type(_)), Some(var_point), Some(var_value)) => {
+            }
+            (
+                ASTNode::T(Tokens::MinusIs),
+                true,
+                Some(HasType::Type(_)),
+                Some(var_point),
+                Some(var_value),
+            ) => {
                 let exp = self.resolv_exec_exp(&ids[2], env, func)?;
-                let new_exp = self.gen_op(var_value, &ASTNode::T(Tokens::Minus), Some(exp), func)?;
+                let new_exp =
+                    self.gen_op(var_value, &ASTNode::T(Tokens::Minus), Some(exp), func)?;
                 self.builder.build_store(
                     var_point.into_pointer_value(),
                     into_basic_value(new_exp).unwrap(),
                 );
-            },
-            (ASTNode::T(Tokens::DivIs), true, Some(HasType::Type(_)), Some(var_point), Some(var_value)) => {
+            }
+            (
+                ASTNode::T(Tokens::DivIs),
+                true,
+                Some(HasType::Type(_)),
+                Some(var_point),
+                Some(var_value),
+            ) => {
                 let exp = self.resolv_exec_exp(&ids[2], env, func)?;
                 let new_exp = self.gen_op(var_value, &ASTNode::T(Tokens::Div), Some(exp), func)?;
                 self.builder.build_store(
                     var_point.into_pointer_value(),
                     into_basic_value(new_exp).unwrap(),
                 );
-            },
-            (ASTNode::T(Tokens::MulIs), true, Some(HasType::Type(_)), Some(var_point), Some(var_value)) => {
+            }
+            (
+                ASTNode::T(Tokens::MulIs),
+                true,
+                Some(HasType::Type(_)),
+                Some(var_point),
+                Some(var_value),
+            ) => {
                 let exp = self.resolv_exec_exp(&ids[2], env, func)?;
                 let new_exp = self.gen_op(var_value, &ASTNode::T(Tokens::Mul), Some(exp), func)?;
                 self.builder.build_store(
                     var_point.into_pointer_value(),
                     into_basic_value(new_exp).unwrap(),
                 );
-            },
-            (ASTNode::T(Tokens::ModIs), true, Some(HasType::Type(_)), Some(var_point), Some(var_value)) => {
+            }
+            (
+                ASTNode::T(Tokens::ModIs),
+                true,
+                Some(HasType::Type(_)),
+                Some(var_point),
+                Some(var_value),
+            ) => {
                 let exp = self.resolv_exec_exp(&ids[2], env, func)?;
                 let new_exp = self.gen_op(var_value, &ASTNode::T(Tokens::Mod), Some(exp), func)?;
                 self.builder.build_store(
                     var_point.into_pointer_value(),
                     into_basic_value(new_exp).unwrap(),
                 );
-            },
+            }
             (ASTNode::T(Tokens::Is), true, Some(HasType::Type(_)), Some(var_point), Some(_)) => {
-                let exp = self.resolv_exec_exp(&ids[2], env, func)?;              
+                let exp = self.resolv_exec_exp(&ids[2], env, func)?;
                 self.builder.build_store(
                     var_point.into_pointer_value(),
                     into_basic_value(exp).unwrap(),
                 );
-            },
+            }
             (op, is_mut, vt, vp, vv) => {
-                return Err(format!("赋值错误：{:?} {:?} {:?} {:?} {:?}，请注意引用对象和对象是否可变", op, is_mut, vt, vp, vv));
+                return Err(format!(
+                    "赋值错误：{:?} {:?} {:?} {:?} {:?}，请注意引用对象和对象是否可变",
+                    op, is_mut, vt, vp, vv
+                ));
             }
         }
 
@@ -1341,20 +1549,20 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
     /// 需要返回值，判断各个块的返回值相同
     /// 需要判断匹配表达式和各个选项类型一致
     /// 然后和各个选项组合成各个选择分支的判断语句
-    fn def_match(&mut self, root: &NodeId, env: &NodeId, func: &FunctionValue) -> Result<AnyValueEnum<'ctx>, String> {
+    fn def_match(
+        &mut self,
+        root: &NodeId,
+        env: &NodeId,
+        func: &FunctionValue,
+    ) -> Result<AnyValueEnum<'ctx>, String> {
         let ids = self.children_ids(root);
         let left = self.resolv_exec_exp(&ids[0], env, func)?;
-        let nodes = post_traversal_retain_and_skipsubtree(self.ast.borrow(), &ids[1], |x| {
-            !matches!(x,
-                ASTNode::NT(NT::ExecExp) |
-                ASTNode::NT(NT::FnBody)
-            )
-        }, |x| {
-            matches!(x,
-                ASTNode::NT(NT::ExecExp) |
-                ASTNode::NT(NT::FnBody)
-            )
-        });
+        let nodes = post_traversal_retain_and_skipsubtree(
+            self.ast.borrow(),
+            &ids[1],
+            |x| !matches!(x, ASTNode::NT(NT::ExecExp) | ASTNode::NT(NT::FnBody)),
+            |x| matches!(x, ASTNode::NT(NT::ExecExp) | ASTNode::NT(NT::FnBody)),
+        );
         // 迭代，每次遇到一个 ExecExp，后面必然是 FnBody，可以根据此弄出各个条件分支跳转
         let mut itr = nodes.into_iter();
         let jump_block = self.context.append_basic_block(*func, "jump_block");
@@ -1378,7 +1586,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                     let func_n = itr.next().unwrap();
                     cases.push((exp_v.into_int_value(), new_block));
                     fns.push((func_n, new_env, new_block));
-                },
+                }
                 other => {
                     return Err(format!("match 匹配，符号 {:?} 未被处理", other));
                 }
@@ -1388,7 +1596,8 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         let match_ty = into_basic_type(left.get_type()).unwrap();
         let result = self.builder.build_alloca(match_ty, "match_result");
         // 构建 switch 跳转，IR 可以做类型判断
-        self.builder.build_switch(left.into_int_value(), jump_block, &cases);
+        self.builder
+            .build_switch(left.into_int_value(), jump_block, &cases);
         // 针对每一个 FnBody 进行解析
         for (funcn, new_env, new_b) in fns {
             self.builder.position_at_end(new_b);
@@ -1398,7 +1607,9 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             self.builder.build_unconditional_branch(jump_block);
         }
         self.builder.position_at_end(jump_block);
-        let result_value = self.builder.build_load(match_ty, result, "match_load_result");
+        let result_value = self
+            .builder
+            .build_load(match_ty, result, "match_load_result");
 
         // 最后返回
         Ok(result_value.as_any_value_enum())
@@ -1439,14 +1650,22 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                     }
                     let new_env = self.symbols.create_env(env);
                     let new_block = self.context.append_basic_block(*func, "elif_block");
-                    let jump_block = self.context.append_basic_block(*func, "next_else_control_block");
-                    self.builder.build_conditional_branch(j.into_int_value(), new_block, jump_block);
+                    let jump_block = self
+                        .context
+                        .append_basic_block(*func, "next_else_control_block");
+                    self.builder.build_conditional_branch(
+                        j.into_int_value(),
+                        new_block,
+                        jump_block,
+                    );
                     self.builder.position_at_end(new_block);
-                    let (fn_ret, broken_switch) = self.resolv_fn_body(fn_node, &new_env, basicb, func, None, false)?;
+                    let (fn_ret, broken_switch) =
+                        self.resolv_fn_body(fn_node, &new_env, basicb, func, None, false)?;
                     // 判断返回类型（return 语句，不能 return 不一样的类型）
-                    if fn_ret.eq(&AnyTypeEnum::StructType(self.get_void_type())) {} 
-                    else if ret.eq(&AnyTypeEnum::StructType(self.get_void_type())) || 
-                        same_type(&ret, &fn_ret) {
+                    if fn_ret.eq(&AnyTypeEnum::StructType(self.get_void_type())) {
+                    } else if ret.eq(&AnyTypeEnum::StructType(self.get_void_type()))
+                        || same_type(&ret, &fn_ret)
+                    {
                         ret = fn_ret;
                     } else {
                         return Err(format!("If 主和 Else If 分支返回类型冲突，应返回类型：{:?}，实际返回类型：{:?}", ret, fn_ret));
@@ -1462,7 +1681,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                     if nodes.get(index + 2).is_none() {
                         self.builder.build_unconditional_branch(merge_block);
                     }
-                },
+                }
                 ASTNode::NT(NT::FnBody) => {
                     // 构建 else 语句
                     if let Some(x) = itr.next() {
@@ -1472,19 +1691,24 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                         // Else 块，可以直接构建语句，最后跳到 merge_block 即可
                         let new_env = self.symbols.create_env(env);
                         // 不允许 break 语句
-                        let (fn_ret, broken_switch) = self.resolv_fn_body(n, &new_env, basicb, func, None, false)?;
-                        if fn_ret.eq(&AnyTypeEnum::StructType(self.get_void_type())) {} 
-                        else if ret.eq(&AnyTypeEnum::StructType(self.get_void_type())) || 
-                            same_type(&ret, &fn_ret) {
+                        let (fn_ret, broken_switch) =
+                            self.resolv_fn_body(n, &new_env, basicb, func, None, false)?;
+                        if fn_ret.eq(&AnyTypeEnum::StructType(self.get_void_type())) {
+                        } else if ret.eq(&AnyTypeEnum::StructType(self.get_void_type()))
+                            || same_type(&ret, &fn_ret)
+                        {
                             ret = fn_ret;
                         } else {
-                            return Err(format!("If Else 分支返回类型冲突，应返回类型：{:?}，实际返回类型：{:?}", ret, fn_ret));
+                            return Err(format!(
+                                "If Else 分支返回类型冲突，应返回类型：{:?}，实际返回类型：{:?}",
+                                ret, fn_ret
+                            ));
                         }
                         if !broken_switch {
                             self.builder.build_unconditional_branch(merge_block);
                         }
                     }
-                },
+                }
                 other => {
                     return Err(format!("If 语义分析无法分析块：{:?}", other));
                 }
@@ -1510,9 +1734,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         let mut ret = AnyTypeEnum::StructType(self.get_void_type());
         let broken_switch;
 
-        let exp_block = self
-        .context
-        .append_basic_block(*func, "exp_block");
+        let exp_block = self.context.append_basic_block(*func, "exp_block");
         let while_block = self.context.append_basic_block(*func, "while_block");
         let jump_block = self.context.append_basic_block(*func, "jump_block");
         let while_env = self.symbols.create_env(env);
@@ -1524,12 +1746,17 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         let exp = self.resolv_exec_exp(&ids[0], env, func)?;
         // 先判断是否可作为判断条件
         if !exp.is_int_value() {
-            return Err(format!("while 判断条件必须为 IntValue，当前条件：{:?}", exp));
+            return Err(format!(
+                "while 判断条件必须为 IntValue，当前条件：{:?}",
+                exp
+            ));
         }
-        self.builder.build_conditional_branch(exp.into_int_value(), while_block, jump_block);
+        self.builder
+            .build_conditional_branch(exp.into_int_value(), while_block, jump_block);
         self.builder.position_at_end(while_block);
         // 返回值
-        (ret, broken_switch) = self.resolv_fn_body(&ids[1], &while_env, Some(jump_block), func, None, false)?;
+        (ret, broken_switch) =
+            self.resolv_fn_body(&ids[1], &while_env, Some(jump_block), func, None, false)?;
         if !broken_switch {
             // self.builder.position_at_end(while_block);
             self.builder.build_unconditional_branch(exp_block);
@@ -1559,7 +1786,8 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         self.builder.build_unconditional_branch(loop_block);
         self.builder.position_at_end(loop_block);
         // 返回值
-        (ret, broken_switch) = self.resolv_fn_body(&ids[0], &loop_env, Some(jump_block), func, None, false)?;
+        (ret, broken_switch) =
+            self.resolv_fn_body(&ids[0], &loop_env, Some(jump_block), func, None, false)?;
         if !broken_switch {
             // self.builder.position_at_end(loop_block);
             self.builder.build_unconditional_branch(exp_block);
@@ -1572,7 +1800,8 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             return Err(format!("loop 判断条件必须为 IntValue，当前条件：{:?}", exp));
         }
         self.builder.position_at_end(exp_block);
-        self.builder.build_conditional_branch(exp.into_int_value(), loop_block, jump_block);
+        self.builder
+            .build_conditional_branch(exp.into_int_value(), loop_block, jump_block);
         self.builder.position_at_end(jump_block);
 
         Ok(ret)
@@ -1592,7 +1821,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
     /// 后续如果做多模块，其实相当于词法阶段做一些解析，多个模块之间根据关系组成图，按照拓扑序不断构造，前面的相关函数、类型等根据规则加入后面的符号表等进行使用
     /// 3. _() 空元组，表示为常量
     /// self 可以不用，直接按照普通量进行符号表查找就行，只是不能对 self 做定义等
-    /// vp, vv, is_mut(bool), Option<HashType> 
+    /// vp, vv, is_mut(bool), Option<HashType>
     /// 2023.6.6，延迟初始化未加入，暂不传递 vt(VType)
     /// 除了错误情况，对各种可能进行归类：（0 1 3）
     /// var_point var_value auto_type
@@ -1609,22 +1838,35 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         &mut self,
         root: &NodeId,
         env: &NodeId,
-        func: &FunctionValue
-    ) -> Result<(Option<AnyValueEnum<'ctx>>, Option<AnyValueEnum<'ctx>>, bool, Option<HasType<'ctx>>), String> {
+        func: &FunctionValue,
+    ) -> Result<
+        (
+            Option<AnyValueEnum<'ctx>>,
+            Option<AnyValueEnum<'ctx>>,
+            bool,
+            Option<HasType<'ctx>>,
+        ),
+        String,
+    > {
         let nodes = post_traversal_retain_and_skipsubtree(
             self.ast,
             root,
             |x| {
-                !matches!(x,
-                    ASTNode::T(Tokens::Identity(_)) | ASTNode::T(Tokens::LeftMB) | 
-                    ASTNode::T(Tokens::Int(_)) | ASTNode::T(Tokens::RightMB) | 
-                    ASTNode::T(Tokens::ShouldReturn) | ASTNode::T(Tokens::LeftC) | 
-                    ASTNode::T(Tokens::RightC) | ASTNode::NT(NT::ExecExp)
+                !matches!(
+                    x,
+                    ASTNode::T(Tokens::Identity(_))
+                        | ASTNode::T(Tokens::LeftMB)
+                        | ASTNode::T(Tokens::Int(_))
+                        | ASTNode::T(Tokens::RightMB)
+                        | ASTNode::T(Tokens::ShouldReturn)
+                        | ASTNode::T(Tokens::LeftC)
+                        | ASTNode::T(Tokens::RightC)
+                        | ASTNode::NT(NT::ExecExp)
                 )
             },
             |x| matches!(x, ASTNode::NT(NT::ExecExp)),
         );
-        
+
         let mut has_pointer = true;
         let mut vv;
         // 先得到第一个变量的值和对应的类型，这里对 _ 、 _() 、右值进行特判
@@ -1637,11 +1879,22 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                     if nodes.len() == 1 {
                         // _ => i32_type().const_zero，不用管是否可变
                         let j = self.basic_value(judge_n)?;
-                        return Ok((Some(j.as_any_value_enum()), Some(j.as_any_value_enum()), false, None));
-                    } else if nodes.len() >= 3 &&
-                        self.node_data(&nodes[1]) == &ASTNode::T(Tokens::LeftC) {
+                        return Ok((
+                            Some(j.as_any_value_enum()),
+                            Some(j.as_any_value_enum()),
+                            false,
+                            None,
+                        ));
+                    } else if nodes.len() >= 3
+                        && self.node_data(&nodes[1]) == &ASTNode::T(Tokens::LeftC)
+                    {
                         if self.node_data(&nodes[2]) == &ASTNode::T(Tokens::RightC) {
-                            return Ok((None, Some(AnyValueEnum::StructValue(self.get_void_value())), false, None));
+                            return Ok((
+                                None,
+                                Some(AnyValueEnum::StructValue(self.get_void_value())),
+                                false,
+                                None,
+                            ));
                         } else {
                             // 看是否是创建了元组，如果是创建了元组，相当于只有值，但要继续下去
                             // _(32, 55...)
@@ -1649,7 +1902,10 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                             // skip = ..;
                         }
                     } else {
-                        return Err(format!("以 _ 开头的成员引用仅支持：_ 和 _()，当前成员引用为：{:?}", nodes));
+                        return Err(format!(
+                            "以 _ 开头的成员引用仅支持：_ 和 _()，当前成员引用为：{:?}",
+                            nodes
+                        ));
                     }
                 } else {
                     let constv = self.basic_value(judge_n);
@@ -1668,30 +1924,43 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                                     has_pointer = false;
                                     let basict = into_basic_type(*t).unwrap();
                                     let tmp = self.builder.build_alloca(basict, "create_tmp");
-                                    self.builder.build_store(tmp, into_basic_value(*ptr).unwrap());
+                                    self.builder
+                                        .build_store(tmp, into_basic_value(*ptr).unwrap());
                                     vv = ptr.as_any_value_enum();
-                                    (tmp.as_any_value_enum(), *t, false, Some(vt.has_type.clone()))
+                                    (
+                                        tmp.as_any_value_enum(),
+                                        *t,
+                                        false,
+                                        Some(vt.has_type.clone()),
+                                    )
                                 } else {
                                     if ptr.is_pointer_value() {
                                         // PointerValue
-                                        vv = self.builder.build_load(into_basic_type(*t).unwrap(), ptr.into_pointer_value(), "init_vv").as_any_value_enum();
+                                        vv = self
+                                            .builder
+                                            .build_load(
+                                                into_basic_type(*t).unwrap(),
+                                                ptr.into_pointer_value(),
+                                                "init_vv",
+                                            )
+                                            .as_any_value_enum();
                                     } else {
                                         // FunctionValue
                                         vv = ptr.as_any_value_enum();
                                     }
                                     (*ptr, *t, vt.is_mut, Some(vt.has_type.clone()))
                                 }
-                            },
+                            }
                             (_, _) => {
                                 return Err(format!("成员：{:?}值未被初始化，无法被引用", varv));
                             }
-                        }   
+                        }
                     } else {
                         return Err(format!("成员未找到：{:?}", x));
                     }
                 }
-            },
-            other => return Err(format!("引用第一个单词错误：{:?}", other))
+            }
+            other => return Err(format!("引用第一个单词错误：{:?}", other)),
         };
 
         let mut itr = nodes.iter().enumerate().skip(skip);
@@ -1699,26 +1968,48 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             match self.node_data(n) {
                 ASTNode::T(Tokens::LeftMB) => {
                     // 获取 int，语法已保证
-                    let i = self.context.i32_type().const_int(*match self.node_data(itr.next().unwrap().1) {
-                        ASTNode::T(Tokens::Int(x)) => {
-                            x
-                        },
-                        other => {
-                            return Err(format!("语法分析：数组索引识别出错，识别到索引：{:?}", other));
-                        }
-                    } as u64, false);
+                    let i = self.context.i32_type().const_int(
+                        *match self.node_data(itr.next().unwrap().1) {
+                            ASTNode::T(Tokens::Int(x)) => x,
+                            other => {
+                                return Err(format!(
+                                    "语法分析：数组索引识别出错，识别到索引：{:?}",
+                                    other
+                                ));
+                            }
+                        } as u64,
+                        false,
+                    );
                     // 跳过 LeftMB
                     itr.next();
-                    let vvv = self.builder.build_load(into_basic_type(vt).unwrap(), vp.into_pointer_value(), "load_ptr");
+                    let vvv = self.builder.build_load(
+                        into_basic_type(vt).unwrap(),
+                        vp.into_pointer_value(),
+                        "load_ptr",
+                    );
                     if vvv.is_array_value() {
                         let vvv_t = vvv.into_array_value().get_type().get_element_type();
-                        vp = unsafe { self.builder.build_gep(vvv_t, vp.into_pointer_value(), &[i], "load_arr_data_ptr") }.as_any_value_enum();
+                        vp = unsafe {
+                            self.builder.build_gep(
+                                vvv_t,
+                                vp.into_pointer_value(),
+                                &[i],
+                                "load_arr_data_ptr",
+                            )
+                        }
+                        .as_any_value_enum();
                         vt = vvv_t.as_any_type_enum();
-                        vv = self.builder.build_load(vvv_t, vp.into_pointer_value(), "load_arr_data").as_any_value_enum();
+                        vv = self
+                            .builder
+                            .build_load(vvv_t, vp.into_pointer_value(), "load_arr_data")
+                            .as_any_value_enum();
                     } else {
-                        return Err(format!("不能对数组以外的符号进行数组索引，当前被引用对象：{:?}", vvv));
+                        return Err(format!(
+                            "不能对数组以外的符号进行数组索引，当前被引用对象：{:?}",
+                            vvv
+                        ));
                     }
-                },
+                }
                 ASTNode::T(Tokens::LeftC) => {
                     // 判断 vp 是不是函数
                     match vp {
@@ -1734,48 +2025,78 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                                 n = itr.next().unwrap();
                             }
                             let call_ret = self.builder.build_call(x, &params, "call_func");
-                            let call_ret_v = call_ret.try_as_basic_value().left().unwrap().as_basic_value_enum();
+                            let call_ret_v = call_ret
+                                .try_as_basic_value()
+                                .left()
+                                .unwrap()
+                                .as_basic_value_enum();
                             let bvt = x.get_type().get_return_type().unwrap();
                             let call_tmp = self.builder.build_alloca(bvt, "build_call_ret_tmp");
                             self.builder.build_store(call_tmp, call_ret_v);
                             vt = bvt.as_any_type_enum();
                             vp = call_tmp.as_any_value_enum();
                             vv = call_ret_v.as_any_value_enum();
-                        },
-                        other => {
-                            return Err(format!("不知名函数：{:?}", other))
                         }
+                        other => return Err(format!("不知名函数：{:?}", other)),
                     }
-                },
+                }
                 ASTNode::T(Tokens::ShouldReturn) => {
                     // 判断是 ->0 还是 ->a 还是 ->a(...)
                     let n = itr.next().unwrap();
                     match self.node_data(n.1) {
                         ASTNode::T(Tokens::Int(x)) => {
                             let i = *x as u32;
-                            let vvv = self.builder.build_load(into_basic_type(vt).unwrap(), vp.into_pointer_value(), "load_ptr");
+                            let vvv = self.builder.build_load(
+                                into_basic_type(vt).unwrap(),
+                                vp.into_pointer_value(),
+                                "load_ptr",
+                            );
                             if vvv.is_struct_value() {
                                 let vvv_t = vvv.into_struct_value().get_type().get_field_types();
-                                vp = unsafe { self.builder.build_gep(vvv_t[i as usize], vp.into_pointer_value(), &[self.context.i32_type().const_int(i as u64, false)], "load_tuple_data_ptr") }.as_any_value_enum();
+                                vp = unsafe {
+                                    self.builder.build_gep(
+                                        vvv_t[i as usize],
+                                        vp.into_pointer_value(),
+                                        &[self.context.i32_type().const_int(i as u64, false)],
+                                        "load_tuple_data_ptr",
+                                    )
+                                }
+                                .as_any_value_enum();
                                 vt = vvv_t[i as usize].as_any_type_enum();
-                                vv = self.builder.build_load(vvv_t[i as usize], vp.into_pointer_value(), "load_tuple_data").as_any_value_enum();
+                                vv = self
+                                    .builder
+                                    .build_load(
+                                        vvv_t[i as usize],
+                                        vp.into_pointer_value(),
+                                        "load_tuple_data",
+                                    )
+                                    .as_any_value_enum();
                             } else {
-                                return Err(format!("不能对数组以外的符号进行数组索引，当前被引用对象：{:?}", vvv));
+                                return Err(format!(
+                                    "不能对数组以外的符号进行数组索引，当前被引用对象：{:?}",
+                                    vvv
+                                ));
                             }
-                        },
+                        }
                         ASTNode::T(Tokens::Identity(x)) => {
                             // 获取结构体相关信息
-                            let vvv = self.builder.build_load(into_basic_type(vt).unwrap(), vp.into_pointer_value(), "load_ptr");
+                            let vvv = self.builder.build_load(
+                                into_basic_type(vt).unwrap(),
+                                vp.into_pointer_value(),
+                                "load_ptr",
+                            );
                             // 结构体字段内情量
                             let str_params;
                             // 结构体作用域（函数）
                             let str_env;
                             if vvv.is_struct_value() {
                                 let st = vvv.into_struct_value().get_type();
-                                (str_params, str_env) = match self.identi_lookup_tytype(&st.to_string(), env) {
+                                (str_params, str_env) = match self
+                                    .identi_lookup_tytype(&st.to_string(), env)
+                                {
                                     Some(stty) => {
                                         (stty.params.clone(), stty.has_env.as_ref().unwrap())
-                                    },
+                                    }
                                     None => {
                                         return Err(format!("结构体类型信息未被记录，无法进行结构体引用，名称为：{:?}", st));
                                     }
@@ -1788,30 +2109,47 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                                     // 先查看是否在 params 内
                                     if let Some(i) = str_params.iter().position(|&f| f == x) {
                                         // 获取结构体字段;
-                                        let vvv_t = vvv.into_struct_value().get_type().get_field_types();
-                                        vp = unsafe { self.builder.build_gep(vvv_t[i], vp.into_pointer_value(), &[self.context.i32_type().const_int(i as u64, false)], "load_struct_data_ptr") }.as_any_value_enum();
+                                        let vvv_t =
+                                            vvv.into_struct_value().get_type().get_field_types();
+                                        vp = unsafe {
+                                            self.builder.build_gep(
+                                                vvv_t[i],
+                                                vp.into_pointer_value(),
+                                                &[self
+                                                    .context
+                                                    .i32_type()
+                                                    .const_int(i as u64, false)],
+                                                "load_struct_data_ptr",
+                                            )
+                                        }
+                                        .as_any_value_enum();
                                         vt = vvv_t[i].as_any_type_enum();
-                                        vv = self.builder.build_load(vvv_t[i], vp.into_pointer_value(), "load_struct_data").as_any_value_enum();
+                                        vv = self
+                                            .builder
+                                            .build_load(
+                                                vvv_t[i],
+                                                vp.into_pointer_value(),
+                                                "load_struct_data",
+                                            )
+                                            .as_any_value_enum();
                                         continue;
                                     } else {
                                         return Err(format!("结构体不存在该字段：{:?}", x));
                                     }
-                                },
-                                Some(_) => ()
+                                }
+                                Some(_) => (),
                             };
                             match self.node_data(&nodes[n.0 + 1]) {
                                 ASTNode::T(Tokens::LeftC) => {
                                     // 解析函数，首先查看是否存在该函数（使用名称）
                                     let str_fun = match self.symbols.looknow_values(x, str_env) {
-                                        Some(x) => {
-                                            match x.value {
-                                                Some(AnyValueEnum::FunctionValue(y)) => y,
-                                                _ => {
-                                                    return Err(format!("结构体不存在该函数：{:?}", x));
-                                                }
+                                        Some(x) => match x.value {
+                                            Some(AnyValueEnum::FunctionValue(y)) => y,
+                                            _ => {
+                                                return Err(format!("结构体不存在该函数：{:?}", x));
                                             }
                                         },
-                                        None => return Err(format!("结构体不存在该函数：{:?}", x))
+                                        None => return Err(format!("结构体不存在该函数：{:?}", x)),
                                     };
                                     let str_fun_p_count = str_fun.count_params();
                                     let mut params = vec![];
@@ -1827,28 +2165,38 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                                     if str_fun_p_count as usize == params.len() + 1 {
                                         params.push(vvv.into())
                                     }
-                                    let call_ret = self.builder.build_call(str_fun, &params, "call_func");
-                                    let call_ret_v = call_ret.try_as_basic_value().left().unwrap().as_basic_value_enum();
+                                    let call_ret =
+                                        self.builder.build_call(str_fun, &params, "call_func");
+                                    let call_ret_v = call_ret
+                                        .try_as_basic_value()
+                                        .left()
+                                        .unwrap()
+                                        .as_basic_value_enum();
                                     let bvt = str_fun.get_type().get_return_type().unwrap();
-                                    let call_tmp = self.builder.build_alloca(bvt, "build_call_ret_tmp");
+                                    let call_tmp =
+                                        self.builder.build_alloca(bvt, "build_call_ret_tmp");
                                     self.builder.build_store(call_tmp, call_ret_v);
                                     vt = bvt.as_any_type_enum();
                                     vp = call_tmp.as_any_value_enum();
                                     vv = call_ret_v.as_any_value_enum();
-                                },
+                                }
                                 other => {
-                                    return Err(format!("结构体除函数调用和字段引用外的其他非法引用: {:?}", other));
+                                    return Err(format!(
+                                        "结构体除函数调用和字段引用外的其他非法引用: {:?}",
+                                        other
+                                    ));
                                 }
                             }
-                        },
+                        }
                         other => {
-                            return Err(format!("-> 引用，后应接数组、字段名称或函数调用，此处引用为：{:?}", other))
+                            return Err(format!(
+                                "-> 引用，后应接数组、字段名称或函数调用，此处引用为：{:?}",
+                                other
+                            ))
                         }
                     }
-                },
-                other => {
-                    return Err(format!("引用格式错误，引用符号：{:?}", other))
                 }
+                other => return Err(format!("引用格式错误，引用符号：{:?}", other)),
             }
         }
 
@@ -1885,7 +2233,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 Ok(AnyValueEnum::IntValue(
                     self.context.i32_type().const_int(_x, true),
                 ))
-            },
+            }
             ASTNode::T(Tokens::Decimal(x)) => {
                 let _x: f64 = match (*x).try_into() {
                     Ok(y) => y,
@@ -1899,11 +2247,11 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 Ok(AnyValueEnum::FloatValue(
                     self.context.f32_type().const_float(_x),
                 ))
-            },
+            }
             ASTNode::T(Tokens::Str(x)) => {
                 let c = self.builder.build_global_string_ptr(x, "str");
                 Ok(AnyValueEnum::PointerValue(c.as_pointer_value()))
-            },
+            }
             ASTNode::T(Tokens::Bool(x)) => {
                 let v = match x {
                     true => 1,
@@ -1920,8 +2268,8 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 } else {
                     Err(format!("单元：{:?} 不为常量", x))
                 }
-            },
-            _ => Err(format!("给定单元 {:?} 不为常量", tok))
+            }
+            _ => Err(format!("给定单元 {:?} 不为常量", tok)),
         }
     }
 
@@ -1949,7 +2297,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             "bool" => {
                 let r = self.context.bool_type();
                 return Ok(AnyTypeEnum::IntType(r));
-            },
+            }
             "()" => {
                 let r = self.get_void_type();
                 return Ok(AnyTypeEnum::StructType(r));
@@ -1963,7 +2311,10 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
     /// 判断左值
     /// 当前先认为函数值也是左值
     fn judge_left_value(&self, v: &AnyValueEnum) -> bool {
-        !matches!(v, AnyValueEnum::PointerValue(_) | AnyValueEnum::FunctionValue(_))
+        !matches!(
+            v,
+            AnyValueEnum::PointerValue(_) | AnyValueEnum::FunctionValue(_)
+        )
     }
 
     /// 处理类型声明语句语义，ExecType
@@ -1982,7 +2333,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                     return Ok(vt);
                 }
                 Err(format!("无此类型：{:?}", x))
-            },
+            }
             ASTNode::T(Tokens::LeftMB) => {
                 let at = self.resolv_exec_type(&ids[1], env)?;
                 if let ASTNode::T(Tokens::Int(alen)) = self.node_data(&ids[3]) {
@@ -1991,7 +2342,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                 } else {
                     unreachable!("数组元素个数标识缺失")
                 }
-            },
+            }
             ASTNode::T(Tokens::LeftC) => {
                 if ids.len() == 2 {
                     let r = self.get_void_type();
@@ -2017,7 +2368,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                     let r = self.context.struct_type(&tuple_inner, false);
                     return Ok(AnyTypeEnum::StructType(r));
                 }
-            },
+            }
             _ => {
                 unreachable!("声明类型的语法检查错误")
             }
@@ -2038,7 +2389,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         // result 表示构建返回语句时，不是 build_return，而是将返回值进行存储
         result: Option<&PointerValue>,
         // FnBody 在没有返回语句构建时，需不需要构建默认返回语句（空元组，表示语句的返回值）
-        need_default_void_return: bool
+        need_default_void_return: bool,
     ) -> Result<(AnyTypeEnum<'ctx>, bool), String> {
         let mut r = AnyTypeEnum::StructType(self.get_void_type());
         // 只需保留 ExecSentence
@@ -2055,39 +2406,29 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
             let eids = self.children_ids(n);
 
             (l, is_over) = match self.node_data(&eids[0]) {
-                ASTNode::NT(NT::ExecStmt) => {
-                    (self.def_var(&eids[0], env, func)?, false)
-                },
-                ASTNode::NT(NT::ExecIs) => {
-                    (self.resolv_exec_is(&eids[0], env, func)?, false)
-                },
-                ASTNode::NT(NT::ExecIf) => {
-                    (self.def_if(&eids[0], env, basicb, func)?, false)
-                },
-                ASTNode::NT(NT::ExecWhile) => {
-                    (self.def_while(&eids[0], env, func)?, false)
-                },
-                ASTNode::NT(NT::ExecLoop) => {
-                    (self.def_loop(&eids[0], env, func)?, false)
-                },
+                ASTNode::NT(NT::ExecStmt) => (self.def_var(&eids[0], env, func)?, false),
+                ASTNode::NT(NT::ExecIs) => (self.resolv_exec_is(&eids[0], env, func)?, false),
+                ASTNode::NT(NT::ExecIf) => (self.def_if(&eids[0], env, basicb, func)?, false),
+                ASTNode::NT(NT::ExecWhile) => (self.def_while(&eids[0], env, func)?, false),
+                ASTNode::NT(NT::ExecLoop) => (self.def_loop(&eids[0], env, func)?, false),
                 ASTNode::NT(NT::ExecRet) => {
                     match result {
                         None => {
                             let ids = self.children_ids(&eids[0]);
                             let value = self.resolv_exec_exp(&ids[0], env, func)?;
                             let r = into_basic_value(value).unwrap();
-                    
+
                             // 创建返回语句
                             self.builder.build_return(Some(&r as &dyn BasicValue));
 
                             // 返回类型
                             (value.get_type(), true)
-                        },
+                        }
                         Some(ptrr) => {
                             let ids = self.children_ids(&eids[0]);
                             let value = self.resolv_exec_exp(&ids[0], env, func)?;
                             let r = into_basic_value(value).unwrap();
-                            
+
                             // 构建存储语句保证
                             self.builder.build_store(*ptrr, r);
 
@@ -2095,21 +2436,20 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
                             (value.get_type(), true)
                         }
                     }
-                },
+                }
                 ASTNode::NT(NT::ExecBreak) => {
                     // 传递需要跳转的块，只允许 loop、while 中，match 不行，由 def_loop 和 def_while 保证
                     // 分析了 break 后，其他的也不需要分析了，表示 FnBody 分析结束
                     // 之后可以将后续语句标记为 unreachable
-                    (self.resolv_exec_break(&eids[0], env, basicb)?, true)   
+                    (self.resolv_exec_break(&eids[0], env, basicb)?, true)
                 }
                 _ => unreachable!("不可能语句"),
             };
 
             // 比较各个其他返回的类型是否相同（return、if/loop/while 中 return 等）
             // 空元组为固定返回类型，不用管，当其本身是空元组时，返回其他类型，第一次转换，第二次判断
-            if l.eq(&AnyTypeEnum::StructType(self.get_void_type())) {} 
-            else if r.eq(&AnyTypeEnum::StructType(self.get_void_type())) || 
-                same_type(&r, &l) {
+            if l.eq(&AnyTypeEnum::StructType(self.get_void_type())) {
+            } else if r.eq(&AnyTypeEnum::StructType(self.get_void_type())) || same_type(&r, &l) {
                 r = l;
             } else {
                 return Err(format!("返回类型冲突。应返回：{:?}，实际返回：{:?}", r, l));
@@ -2121,7 +2461,9 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
         }
         if need_default_void_return && !is_over {
             // 默认添加 ret ()
-            self.builder.build_return(Some(&self.get_void_value().as_basic_value_enum() as &dyn BasicValue));
+            self.builder.build_return(Some(
+                &self.get_void_value().as_basic_value_enum() as &dyn BasicValue
+            ));
         }
         Ok((r, is_over))
     }
@@ -2135,7 +2477,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
     fn identi_lookup_types(&self, id: &str, env: &NodeId) -> Option<AnyTypeEnum> {
         self.symbols.lookup_types(id, env).map(|x| x.type_value)
     }
-    
+
     #[inline]
     fn identi_lookup_tytype(&self, id: &str, env: &NodeId) -> Option<&TyType> {
         self.symbols.lookup_types(id, env)
@@ -2145,7 +2487,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
     fn identi_lookup_values(&self, id: &str, env: &NodeId) -> Option<AnyValueEnum> {
         match self.symbols.lookup_values(id, env) {
             Some(x) => x.value,
-            None => None
+            None => None,
         }
     }
 
@@ -2168,7 +2510,7 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
     fn identi_looknow_values(&self, id: &str, env: &NodeId) -> Option<AnyValueEnum> {
         match self.symbols.looknow_values(id, env) {
             Some(x) => x.value,
-            None => None
+            None => None,
         }
     }
 
@@ -2178,22 +2520,12 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
     }
 
     #[inline]
-    fn push_identi_type(
-        &mut self,
-        id: &str,
-        value: TyType<'ctx>,
-        env: &NodeId,
-    ) {
+    fn push_identi_type(&mut self, id: &str, value: TyType<'ctx>, env: &NodeId) {
         self.symbols.push_symbol_types(id, value, env);
     }
 
     #[inline]
-    fn push_identi_values(
-        &mut self,
-        id: &str,
-        value: VType<'ctx>,
-        env: &NodeId,
-    ) {
+    fn push_identi_values(&mut self, id: &str, value: VType<'ctx>, env: &NodeId) {
         self.symbols.push_symbol_values(id, value, env);
     }
 
@@ -2212,10 +2544,15 @@ impl<'a, 'ctx> IrGen<'a, 'ctx> where 'ctx: 'a {
 mod llvmir_gen_tests {
     use std::fs::File;
 
-    use id_tree::{Tree, Node};
+    use id_tree::{Node, Tree};
     use inkwell::context::Context;
 
-    use crate::{semantic::llvmir_gen::same_type, syntax::{ASTNode, ll_parser::RecursiveDescentParser, NT}, lex::{Tokens, analysis::Analysis, preprocessor::preprocessor}, table::symbol::SymbolManager};
+    use crate::{
+        lex::{analysis::Analysis, preprocessor::preprocessor, Tokens},
+        semantic::llvmir_gen::same_type,
+        syntax::{ll_parser::RecursiveDescentParser, ASTNode, NT},
+        table::symbol::SymbolManager,
+    };
 
     use super::{post_traversal_retain_and_skipsubtree, IrGen};
 
@@ -2232,7 +2569,8 @@ mod llvmir_gen_tests {
             parser.print_test();
             let context = Context::create();
             let mut symbols = SymbolManager::new();
-            let mut llvmir_gen_engine = IrGen::new(parser.get_ast(), &context, &mut symbols, $funcN);
+            let mut llvmir_gen_engine =
+                IrGen::new(parser.get_ast(), &context, &mut symbols, $funcN);
             let result = llvmir_gen_engine.gen();
             if let Err(e) = &result {
                 println!("{}", e);
@@ -2251,7 +2589,8 @@ mod llvmir_gen_tests {
                 println!("verified ok!");
                 assert!($test)
             }
-            let run = llvmir_gen_engine.jit_execute::<$retT>(inkwell::OptimizationLevel::None, "main");
+            let run =
+                llvmir_gen_engine.jit_execute::<$retT>(inkwell::OptimizationLevel::None, "main");
             match (&run, &$ret) {
                 (Err(e), _) => println!("{}", e),
                 (Ok(l), Some(r)) => {
@@ -2262,8 +2601,8 @@ mod llvmir_gen_tests {
                         println!("func ret: {}, expected: {}, not same!", l, r);
                         assert!(!$test)
                     }
-                },
-                _ => ()
+                }
+                _ => (),
             }
         };
     }
@@ -2274,17 +2613,23 @@ mod llvmir_gen_tests {
         let builder = context.create_builder();
         let i32_type = context.i32_type();
         let i1_type = context.bool_type();
-    
+
         // negate 操作最后应该返回 i1.type
         let value = i32_type.const_int(42, false);
         let bool_value = builder.build_int_truncate(value, i1_type, "bool_value");
         let value1 = i32_type.const_int(0, false);
         let bool_value1 = builder.build_int_truncate(value1, i1_type, "bool_value");
-    
+
         println!("Original value: {:?}", value.get_zero_extended_constant());
-        println!("Boolean value: {:?}", bool_value.get_zero_extended_constant());
+        println!(
+            "Boolean value: {:?}",
+            bool_value.get_zero_extended_constant()
+        );
         println!("Original value1: {:?}", value1.get_zero_extended_constant());
-        println!("Boolean value1: {:?}", bool_value1.get_zero_extended_constant());
+        println!(
+            "Boolean value1: {:?}",
+            bool_value1.get_zero_extended_constant()
+        );
     }
 
     #[test]
@@ -2305,32 +2650,63 @@ mod llvmir_gen_tests {
     #[test]
     fn test_post_traversal_retain_and_skipsubtree() {
         let mut tree = Tree::new();
-        let root_id = tree.insert(Node::new(ASTNode::NT(crate::syntax::NT::ExecExp)), id_tree::InsertBehavior::AsRoot).unwrap();
-        let node_1 = tree.insert(Node::new(ASTNode::NT(crate::syntax::NT::ExecSentence)), id_tree::InsertBehavior::UnderNode(&root_id)).unwrap();
-        let node_1_b1 = tree.insert(Node::new(ASTNode::T(crate::lex::Tokens::AndS)), id_tree::InsertBehavior::UnderNode(&root_id)).unwrap();
-        let node_2 = tree.insert(Node::new(ASTNode::NT(crate::syntax::NT::FnBody)), id_tree::InsertBehavior::UnderNode(&node_1)).unwrap();
-        let node_2_b1 = tree.insert(Node::new(ASTNode::T(crate::lex::Tokens::And)), id_tree::InsertBehavior::UnderNode(&node_1)).unwrap();
+        let root_id = tree
+            .insert(
+                Node::new(ASTNode::NT(crate::syntax::NT::ExecExp)),
+                id_tree::InsertBehavior::AsRoot,
+            )
+            .unwrap();
+        let node_1 = tree
+            .insert(
+                Node::new(ASTNode::NT(crate::syntax::NT::ExecSentence)),
+                id_tree::InsertBehavior::UnderNode(&root_id),
+            )
+            .unwrap();
+        let node_1_b1 = tree
+            .insert(
+                Node::new(ASTNode::T(crate::lex::Tokens::AndS)),
+                id_tree::InsertBehavior::UnderNode(&root_id),
+            )
+            .unwrap();
+        let node_2 = tree
+            .insert(
+                Node::new(ASTNode::NT(crate::syntax::NT::FnBody)),
+                id_tree::InsertBehavior::UnderNode(&node_1),
+            )
+            .unwrap();
+        let node_2_b1 = tree
+            .insert(
+                Node::new(ASTNode::T(crate::lex::Tokens::And)),
+                id_tree::InsertBehavior::UnderNode(&node_1),
+            )
+            .unwrap();
         let mut tree_str = String::new();
         tree.write_formatted(&mut tree_str);
         println!("{}", tree_str);
 
-        let nodes: Vec<&ASTNode> = post_traversal_retain_and_skipsubtree(&tree, &root_id, |x| {
-            !matches!(x,
-                ASTNode::NT(crate::syntax::NT::ExecExp)
-            )
-        }, |x| {
-            matches!(x,
-                ASTNode::NT(crate::syntax::NT::ExecExp)
-            )
-        }).into_iter().map(|x| tree.get(&x).unwrap().data()).collect();
-        let nodes2: Vec<&ASTNode> = post_traversal_retain_and_skipsubtree(&tree, &root_id, |x| {
-            !matches!(x,
-                ASTNode::T(Tokens::And) |
-                ASTNode::T(Tokens::AndS)
-            )
-        }, |_x| false).into_iter().map(|x| tree.get(&x).unwrap().data()).collect();
+        let nodes: Vec<&ASTNode> = post_traversal_retain_and_skipsubtree(
+            &tree,
+            &root_id,
+            |x| !matches!(x, ASTNode::NT(crate::syntax::NT::ExecExp)),
+            |x| matches!(x, ASTNode::NT(crate::syntax::NT::ExecExp)),
+        )
+        .into_iter()
+        .map(|x| tree.get(&x).unwrap().data())
+        .collect();
+        let nodes2: Vec<&ASTNode> = post_traversal_retain_and_skipsubtree(
+            &tree,
+            &root_id,
+            |x| !matches!(x, ASTNode::T(Tokens::And) | ASTNode::T(Tokens::AndS)),
+            |_x| false,
+        )
+        .into_iter()
+        .map(|x| tree.get(&x).unwrap().data())
+        .collect();
 
-        assert_eq!(Some(&&ASTNode::NT(crate::syntax::NT::ExecExp)), nodes.get(0));
+        assert_eq!(
+            Some(&&ASTNode::NT(crate::syntax::NT::ExecExp)),
+            nodes.get(0)
+        );
         assert_eq!(None, nodes.get(1));
         assert_eq!(Some(&&ASTNode::T(Tokens::And)), nodes2.get(0));
         assert_eq!(Some(&&ASTNode::T(Tokens::AndS)), nodes2.get(1));
@@ -2341,16 +2717,66 @@ mod llvmir_gen_tests {
     /// 测试 skip_func
     fn test_post_traversal_retain_and_skipsubtree_exp() {
         let mut tree = Tree::new();
-        let root_id = tree.insert(Node::new(ASTNode::NT(crate::syntax::NT::ExecExp)), id_tree::InsertBehavior::AsRoot).unwrap();
-        let node_1 = tree.insert(Node::new(ASTNode::NT(crate::syntax::NT::ExecExpAndS)), id_tree::InsertBehavior::UnderNode(&root_id)).unwrap();
-        let node_2_b1 = tree.insert(Node::new(ASTNode::NT(crate::syntax::NT::ExecExpSigOp)), id_tree::InsertBehavior::UnderNode(&node_1)).unwrap();
-        let node_2_b2 = tree.insert(Node::new(ASTNode::NT(crate::syntax::NT::ExecR2)), id_tree::InsertBehavior::UnderNode(&node_1)).unwrap();
-        let node_3_b1_b1 = tree.insert(Node::new(ASTNode::T(crate::lex::Tokens::Negate)), id_tree::InsertBehavior::UnderNode(&node_2_b1)).unwrap();
-        let node_3_b1_b2 = tree.insert(Node::new(ASTNode::T(crate::lex::Tokens::Int(3))), id_tree::InsertBehavior::UnderNode(&node_2_b1)).unwrap();
-        let node_4_b2_b1 = tree.insert(Node::new(ASTNode::T(crate::lex::Tokens::AndS)), id_tree::InsertBehavior::UnderNode(&node_2_b2)).unwrap();
-        let node_4_b2_b2 = tree.insert(Node::new(ASTNode::NT(crate::syntax::NT::ExecExpSigOp)), id_tree::InsertBehavior::UnderNode(&node_2_b2)).unwrap();
-        let node_5_b2_b2_b1 = tree.insert(Node::new(ASTNode::T(Tokens::Negate)), id_tree::InsertBehavior::UnderNode(&node_4_b2_b2)).unwrap();
-        let node_5_b2_b2_b2 = tree.insert(Node::new(ASTNode::T(Tokens::Int(4))), id_tree::InsertBehavior::UnderNode(&node_4_b2_b2)).unwrap();
+        let root_id = tree
+            .insert(
+                Node::new(ASTNode::NT(crate::syntax::NT::ExecExp)),
+                id_tree::InsertBehavior::AsRoot,
+            )
+            .unwrap();
+        let node_1 = tree
+            .insert(
+                Node::new(ASTNode::NT(crate::syntax::NT::ExecExpAndS)),
+                id_tree::InsertBehavior::UnderNode(&root_id),
+            )
+            .unwrap();
+        let node_2_b1 = tree
+            .insert(
+                Node::new(ASTNode::NT(crate::syntax::NT::ExecExpSigOp)),
+                id_tree::InsertBehavior::UnderNode(&node_1),
+            )
+            .unwrap();
+        let node_2_b2 = tree
+            .insert(
+                Node::new(ASTNode::NT(crate::syntax::NT::ExecR2)),
+                id_tree::InsertBehavior::UnderNode(&node_1),
+            )
+            .unwrap();
+        let node_3_b1_b1 = tree
+            .insert(
+                Node::new(ASTNode::T(crate::lex::Tokens::Negate)),
+                id_tree::InsertBehavior::UnderNode(&node_2_b1),
+            )
+            .unwrap();
+        let node_3_b1_b2 = tree
+            .insert(
+                Node::new(ASTNode::T(crate::lex::Tokens::Int(3))),
+                id_tree::InsertBehavior::UnderNode(&node_2_b1),
+            )
+            .unwrap();
+        let node_4_b2_b1 = tree
+            .insert(
+                Node::new(ASTNode::T(crate::lex::Tokens::AndS)),
+                id_tree::InsertBehavior::UnderNode(&node_2_b2),
+            )
+            .unwrap();
+        let node_4_b2_b2 = tree
+            .insert(
+                Node::new(ASTNode::NT(crate::syntax::NT::ExecExpSigOp)),
+                id_tree::InsertBehavior::UnderNode(&node_2_b2),
+            )
+            .unwrap();
+        let node_5_b2_b2_b1 = tree
+            .insert(
+                Node::new(ASTNode::T(Tokens::Negate)),
+                id_tree::InsertBehavior::UnderNode(&node_4_b2_b2),
+            )
+            .unwrap();
+        let node_5_b2_b2_b2 = tree
+            .insert(
+                Node::new(ASTNode::T(Tokens::Int(4))),
+                id_tree::InsertBehavior::UnderNode(&node_4_b2_b2),
+            )
+            .unwrap();
         let mut tree_str = String::new();
         tree.write_formatted(&mut tree_str);
         println!("{}", tree_str);
@@ -2359,31 +2785,46 @@ mod llvmir_gen_tests {
             &tree,
             &root_id,
             |x| {
-                !matches!(x,
-                    ASTNode::T(Tokens::OrS) | ASTNode::T(Tokens::AndS) | 
-                    ASTNode::T(Tokens::Or) | ASTNode::T(Tokens::And) | 
-                    ASTNode::T(Tokens::Eq) | ASTNode::T(Tokens::Ne) | 
-                    ASTNode::T(Tokens::Gt) | ASTNode::T(Tokens::Lt) | 
-                    ASTNode::T(Tokens::Ge) | ASTNode::T(Tokens::Le) | 
-                    ASTNode::T(Tokens::Plus) | ASTNode::T(Tokens::Minus) | 
-                    ASTNode::T(Tokens::Mul) | ASTNode::T(Tokens::Div) | 
-                    ASTNode::T(Tokens::Mod) | ASTNode::T(Tokens::Negate) | 
-                    ASTNode::T(Tokens::Str(_)) | ASTNode::T(Tokens::Int(_)) | 
-                    ASTNode::T(Tokens::Decimal(_)) | ASTNode::T(Tokens::Bool(_)) | 
-                    ASTNode::NT(NT::ExecMatch) | ASTNode::NT(NT::ExecVar) | 
-                    ASTNode::NT(NT::ExecExp)
+                !matches!(
+                    x,
+                    ASTNode::T(Tokens::OrS)
+                        | ASTNode::T(Tokens::AndS)
+                        | ASTNode::T(Tokens::Or)
+                        | ASTNode::T(Tokens::And)
+                        | ASTNode::T(Tokens::Eq)
+                        | ASTNode::T(Tokens::Ne)
+                        | ASTNode::T(Tokens::Gt)
+                        | ASTNode::T(Tokens::Lt)
+                        | ASTNode::T(Tokens::Ge)
+                        | ASTNode::T(Tokens::Le)
+                        | ASTNode::T(Tokens::Plus)
+                        | ASTNode::T(Tokens::Minus)
+                        | ASTNode::T(Tokens::Mul)
+                        | ASTNode::T(Tokens::Div)
+                        | ASTNode::T(Tokens::Mod)
+                        | ASTNode::T(Tokens::Negate)
+                        | ASTNode::T(Tokens::Str(_))
+                        | ASTNode::T(Tokens::Int(_))
+                        | ASTNode::T(Tokens::Decimal(_))
+                        | ASTNode::T(Tokens::Bool(_))
+                        | ASTNode::NT(NT::ExecMatch)
+                        | ASTNode::NT(NT::ExecVar)
+                        | ASTNode::NT(NT::ExecExp)
                 )
             },
             |x| {
                 // 不对其子树进行遍历
                 matches!(
                     x,
-                    ASTNode::NT(NT::ExecMatch) | 
-                    ASTNode::NT(NT::ExecVar) | 
-                    ASTNode::NT(NT::ExecExp)
+                    ASTNode::NT(NT::ExecMatch)
+                        | ASTNode::NT(NT::ExecVar)
+                        | ASTNode::NT(NT::ExecExp)
                 )
             },
-        ).into_iter().map(|x| tree.get(&x).unwrap().data()).collect();
+        )
+        .into_iter()
+        .map(|x| tree.get(&x).unwrap().data())
+        .collect();
 
         assert_eq!(Some(&&ASTNode::NT(NT::ExecExp)), nodes.get(0));
         assert_eq!(None, nodes.get(1));
@@ -2403,7 +2844,7 @@ mod llvmir_gen_tests {
     fn test3() {
         llvmir_gen_test_macro!("s20.ms", true, i32, Some(12), "main");
     }
-    
+
     #[test]
     fn test4() {
         llvmir_gen_test_macro!("s21.ms", true, i32, Some(12), "main");
@@ -2438,7 +2879,7 @@ mod llvmir_gen_tests {
     fn test10() {
         llvmir_gen_test_macro!("s27.ms", true, i32, Some(3), "main");
     }
-    
+
     #[test]
     fn test11() {
         llvmir_gen_test_macro!("s28.ms", true, f32, Some(7.754), "main");
@@ -2448,7 +2889,7 @@ mod llvmir_gen_tests {
     fn test12() {
         llvmir_gen_test_macro!("s29.ms", true, i32, Some(13), "main");
     }
-    
+
     #[test]
     fn test13() {
         llvmir_gen_test_macro!("s30.ms", true, f32, Some(5.3), "main");

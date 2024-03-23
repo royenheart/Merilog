@@ -6,7 +6,7 @@ pub enum Froms {
     Preprocessor,
     Lex,
     Syntax,
-    Semantic
+    Semantic,
 }
 
 impl Display for Froms {
@@ -25,7 +25,7 @@ impl Display for Froms {
 pub enum Types {
     Info,
     Warning,
-    Error
+    Error,
 }
 
 impl Display for Types {
@@ -43,7 +43,7 @@ impl Display for Types {
 pub enum LineType {
     Note,
     Happen,
-    Relate
+    Relate,
 }
 
 /// 错误类型
@@ -52,28 +52,61 @@ pub enum LineType {
 /// 3. 和错误有关的位置的提示（往往是引起错误的，或者是一些帮助修改的提示性信息）
 #[derive(PartialEq, Debug)]
 pub struct Mis<'a> {
-    who: Froms, 
+    who: Froms,
     /// 类型
     wtype: Types,
     /// 介绍
     intro: &'a str,
     file: &'a str,
     /// 行号，各行类型，起始位置，偏移量，提示信息，具体代码
-    lines: Option<Vec<(usize, Option<LineType>, Option<(usize, usize)>, &'a str, &'a str)>>,
+    lines: Option<
+        Vec<(
+            usize,
+            Option<LineType>,
+            Option<(usize, usize)>,
+            &'a str,
+            &'a str,
+        )>,
+    >,
 }
 
 impl<'a> Mis<'a> {
-    pub fn new (who: Froms, wtype: Types, intro: &'a str, file: &'a str, lines: Option<Vec<(usize, Option<LineType>, Option<(usize, usize)>, &'a str, &'a str)>>) -> Self {
-        Mis { who, wtype, intro, file, lines }
+    pub fn new(
+        who: Froms,
+        wtype: Types,
+        intro: &'a str,
+        file: &'a str,
+        lines: Option<
+            Vec<(
+                usize,
+                Option<LineType>,
+                Option<(usize, usize)>,
+                &'a str,
+                &'a str,
+            )>,
+        >,
+    ) -> Self {
+        Mis {
+            who,
+            wtype,
+            intro,
+            file,
+            lines,
+        }
     }
 
-    pub fn add_line(&mut self, line: usize, info: &'a str, code: &'a str, line_type: Option<LineType>, pos: Option<(usize, usize)>) {
+    pub fn add_line(
+        &mut self,
+        line: usize,
+        info: &'a str,
+        code: &'a str,
+        line_type: Option<LineType>,
+        pos: Option<(usize, usize)>,
+    ) {
         let g = (line, line_type, pos, info, code);
         match &mut self.lines {
             Some(x) => x.push(g),
-            None => {
-                self.lines = Some(vec![g])
-            }
+            None => self.lines = Some(vec![g]),
         }
     }
 }
@@ -98,7 +131,7 @@ impl<'a> Display for Mis<'a> {
                         l.push_str(format!(":{}", start).as_str());
                         start_from = start - 1;
                         how_many = offset;
-                    },
+                    }
                     None => {
                         start_from = 0;
                         how_many = 1;
@@ -106,25 +139,34 @@ impl<'a> Display for Mis<'a> {
                 }
                 l.push(';');
                 match line_type {
-                    Some(x) => {
-                        match x {
-                            LineType::Note => stand = '*',
-                            LineType::Happen => stand = '^',
-                            LineType::Relate => stand = '&'
-                        }
+                    Some(x) => match x {
+                        LineType::Note => stand = '*',
+                        LineType::Happen => stand = '^',
+                        LineType::Relate => stand = '&',
                     },
-                    None => {
-                        stand = '-'
-                    }
+                    None => stand = '-',
                 }
-                s.push_str(format!("{:width$}|\t{}\n", line, code, width=6).as_str());
-                s.push_str(format!("{:width$}|\t{:from$}", "", "", width = width, from = start_from).as_str());
+                s.push_str(format!("{:width$}|\t{}\n", line, code, width = 6).as_str());
+                s.push_str(
+                    format!(
+                        "{:width$}|\t{:from$}",
+                        "",
+                        "",
+                        width = width,
+                        from = start_from
+                    )
+                    .as_str(),
+                );
                 for _ in 1..=how_many {
                     s.push(stand);
                 }
                 s.push_str(format!("-->{}\n", info).as_str());
             }
         }
-        write!(f, "{} from {}: {}\n In {}:{}\n{}", self.wtype, self.who, self.intro, self.file, l, s)
+        write!(
+            f,
+            "{} from {}: {}\n In {}:{}\n{}",
+            self.wtype, self.who, self.intro, self.file, l, s
+        )
     }
 }

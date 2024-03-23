@@ -11,7 +11,7 @@ use graphviz_rust::printer::PrinterContext;
 
 fn main() {
     // 词法分析流程
-    let f = graph!(strict di id!("f");    
+    let f = graph!(strict di id!("f");
         node!("p"; attr!("label", "preprocess"), attr!("shape", "record"), attr!("color", "red")),
         node!("l"; attr!("label", "lex"), attr!("shape", "record"), attr!("color", "blue")),
         node!("b"; attr!("label", "buffer"), attr!("shape", "ellipse")),
@@ -22,8 +22,13 @@ fn main() {
     path.push("examples/tests/lex_flow.png");
     let mut ctx = PrinterContext::default();
     ctx.always_inline();
-    exec(f, &mut ctx, vec![
-        CommandArg::Format(Format::Png),
-        CommandArg::Output(path.to_str().unwrap().to_string())
-    ]).unwrap();
+    exec(
+        f,
+        &mut ctx,
+        vec![
+            CommandArg::Format(Format::Png),
+            CommandArg::Output(path.to_str().unwrap().to_string()),
+        ],
+    )
+    .unwrap();
 }

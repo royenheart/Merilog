@@ -2,15 +2,18 @@
 name = "Merilog"
 version = "0.1.0"
 edition = "2021"
-authors = [ "RoyenHeart royenheart@outlook.com" ]
+authors = ["RoyenHeart royenheart@outlook.com"]
 repository = "https://github.com/royenheart/Merilog"
 
 [dependencies]
+proc-macro2 = "1.0.79"
 id_tree = "1.8.0"
 id_tree_layout = "2.0.4"
-inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm15-0"] }
+inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = [
+    "llvm15-0",
+] }
 lazy_static = "1.4.0"
 llvm-sys = "150.0.5"
 
 [dev-dependencies]
-graphviz-rust = "0.6.1"
+graphviz-rust = "0.7.2"

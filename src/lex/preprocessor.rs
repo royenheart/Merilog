@@ -1,6 +1,9 @@
 //! 预处理 - 多个空格替换成一个空格，去除没必要的空行
 
-use std::{fs::File, io::{BufReader, BufRead}};
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+};
 
 pub fn preprocessor(file: &File) -> String {
     let r = BufReader::new(file);

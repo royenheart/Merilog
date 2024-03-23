@@ -1,26 +1,30 @@
 //! LL1 递归下降分析
 
-use id_tree::{Node, NodeId};
+use super::ASTNode;
+use super::{AST, NT};
+use crate::lex::analysis::Analysis;
+use crate::lex::Tokens;
+use crate::mistakes::show::Mis;
 use id_tree::InsertBehavior::AsRoot;
 use id_tree::InsertBehavior::UnderNode;
-use id_tree::PreOrderTraversal;
-use id_tree::PostOrderTraversal;
 use id_tree::LevelOrderTraversal;
-use crate::lex::Tokens;
-use crate::lex::analysis::Analysis;
-use crate::mistakes::show::Mis;
-use super::{AST, NT};
-use super::{ASTNode};
+use id_tree::PostOrderTraversal;
+use id_tree::PreOrderTraversal;
+use id_tree::{Node, NodeId};
 
 macro_rules! insert_t {
     ($tree: expr, $root: expr, $tok: expr) => {
-        $tree.insert(Node::new(ASTNode::T($tok)), UnderNode(&$root)).unwrap()
+        $tree
+            .insert(Node::new(ASTNode::T($tok)), UnderNode(&$root))
+            .unwrap()
     };
 }
 
 macro_rules! insert_nt {
     ($tree: expr, $root: expr, $type: expr) => {
-        $tree.insert(Node::new(ASTNode::NT($type)), UnderNode(&$root)).unwrap()
+        $tree
+            .insert(Node::new(ASTNode::NT($type)), UnderNode(&$root))
+            .unwrap()
     };
 }
 
@@ -35,7 +39,7 @@ pub struct RecursiveDescentParser {
     tokens: Vec<Tokens>,
     // 当前分析词法索引
     current: usize,
-    tree: AST
+    tree: AST,
 }
 
 impl RecursiveDescentParser {
@@ -47,9 +51,10 @@ impl RecursiveDescentParser {
             .filter(|x: &Tokens| !matches!(x, Tokens::CommentBlock(_) | Tokens::CommentModule(_)))
             .collect();
         tokens.push(Tokens::End);
-        Ok(RecursiveDescentParser { 
+        Ok(RecursiveDescentParser {
             tokens,
-            current: 0, tree
+            current: 0,
+            tree,
         })
     }
 
@@ -108,16 +113,20 @@ impl RecursiveDescentParser {
 
     /// 返回当前匹配词法单元的上一个词法单元
     fn copy_pre(&self) -> Option<Tokens> {
-        if self.current == 0 {return None;}
+        if self.current == 0 {
+            return None;
+        }
         Some(self.tokens[self.current - 1].clone())
     }
 
     /// 返回当前匹配词法单元
     fn copy_now(&self) -> Option<Tokens> {
-        if self.current >= self.tokens.len() {return None;}
+        if self.current >= self.tokens.len() {
+            return None;
+        }
         Some(self.tokens[self.current].clone())
     }
-    
+
     /// 将顺序子节点合并为一个节点，进行化简
     fn adjust_single_child(&mut self, node: NodeId) {
         let c_num = self.tree.children(&node).unwrap().count();
@@ -125,7 +134,9 @@ impl RecursiveDescentParser {
         if c_num != 1 {
             return;
         }
-        self.tree.remove_node(node, id_tree::RemoveBehavior::LiftChildren).unwrap();
+        self.tree
+            .remove_node(node, id_tree::RemoveBehavior::LiftChildren)
+            .unwrap();
     }
 
     fn term_str(&mut self, next: bool, insert: Option<&NodeId>) -> Option<Tokens> {
@@ -136,7 +147,7 @@ impl RecursiveDescentParser {
         if let Tokens::Str(_) = self.tokens[self.current] {
             match next {
                 true => self.current += 1,
-                false => ()
+                false => (),
             };
             let r = self.copy_pre();
             if let (Some(id), Some(tok)) = (insert, r) {
@@ -152,11 +163,11 @@ impl RecursiveDescentParser {
         if self.current >= self.tokens.len() {
             return None;
         }
-        
+
         if let Tokens::Int(_) = self.tokens[self.current] {
             match next {
                 true => self.current += 1,
-                false => ()
+                false => (),
             };
             let r = self.copy_pre();
             if let (Some(id), Some(tok)) = (insert, r) {
@@ -176,7 +187,7 @@ impl RecursiveDescentParser {
         if let Tokens::Decimal(_) = self.tokens[self.current] {
             match next {
                 true => self.current += 1,
-                false => ()
+                false => (),
             };
             let r = self.copy_pre();
             if let (Some(id), Some(tok)) = (insert, r) {
@@ -196,7 +207,7 @@ impl RecursiveDescentParser {
         if let Tokens::Bool(_) = self.tokens[self.current] {
             match next {
                 true => self.current += 1,
-                false => ()
+                false => (),
             };
             let r = self.copy_pre();
             if let (Some(id), Some(tok)) = (insert, r) {
@@ -216,7 +227,7 @@ impl RecursiveDescentParser {
         if let Tokens::Identity(_) = self.tokens[self.current] {
             match next {
                 true => self.current += 1,
-                false => ()
+                false => (),
             };
             let r = self.copy_pre();
             if let (Some(id), Some(tok)) = (insert, r) {
@@ -239,7 +250,7 @@ impl RecursiveDescentParser {
         if self.tokens[self.current] == tok {
             match next {
                 true => self.current += 1,
-                false => ()
+                false => (),
             };
             if let Some(id) = insert {
                 insert_t!(self.tree, id, tok);
@@ -250,35 +261,38 @@ impl RecursiveDescentParser {
         false
     }
 
-    /// 匹配当前 token 是否属于给定的 toks 
+    /// 匹配当前 token 是否属于给定的 toks
     fn terms(&mut self, toks: Vec<Tokens>, next: bool, insert: Option<&NodeId>) -> bool {
         for tok in toks {
             match self.term(tok, next, insert) {
                 false => (),
-                true => return true
+                true => return true,
             }
         }
         false
     }
 
     fn match_merilog(&mut self, root: &NodeId) -> bool {
-        loop {            
+        loop {
             match self.tokens[self.current] {
                 Tokens::Struct => {
                     if !self.match_define_struct(root) {
                         return false;
                     }
-                },
+                }
                 Tokens::Fn => {
                     if !self.match_define_fn(root) {
                         return false;
                     }
-                },
+                }
                 Tokens::End => {
                     return true;
-                },
+                }
                 _ => {
-                    println!("程序应包含结构体定义或函数，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+                    println!(
+                        "程序应包含结构体定义或函数，目前词法单元：{:?}，位置: {:?}",
+                        self.tokens[self.current], self.current
+                    );
                     return false;
                 }
             }
@@ -289,17 +303,23 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::DefineStruct);
 
-        if self.term(Tokens::Struct, true, None) && 
-            self.term_identity(true, Some(&me)).is_some() && 
-            self.term(Tokens::LeftBC, true, None) && 
-            self.match_define_struct_body(&me) && 
-            self.term(Tokens::RightBC, true, None) {
+        if self.term(Tokens::Struct, true, None)
+            && self.term_identity(true, Some(&me)).is_some()
+            && self.term(Tokens::LeftBC, true, None)
+            && self.match_define_struct_body(&me)
+            && self.term(Tokens::RightBC, true, None)
+        {
             return true;
         };
 
-        println!("结构体内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "结构体内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -309,33 +329,38 @@ impl RecursiveDescentParser {
 
         'l: {
             if self.term_identity(true, Some(&me)).is_some() {
-                if self.term(Tokens::Semicolon, true, None) && 
-                    self.match_exec_type(&me) &&
-                    self.match_define_struct_body_next(&me) {
+                if self.term(Tokens::Semicolon, true, None)
+                    && self.match_exec_type(&me)
+                    && self.match_define_struct_body_next(&me)
+                {
                     return true;
                 }
                 break 'l;
             }
 
             if self.term(Tokens::Fn, false, None) {
-                if self.match_define_fn(&me) && 
-                    self.match_define_struct_body_next(&me) {
+                if self.match_define_fn(&me) && self.match_define_struct_body_next(&me) {
                     return true;
                 }
                 break 'l;
             }
         }
 
-        println!("结构体内域定义问题，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "结构体内域定义问题，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
     fn match_define_struct_body_next(&mut self, root: &NodeId) -> bool {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::DefineStructBodyNext);
-        
+
         'l: {
             if self.term(Tokens::Comma, true, None) {
                 if self.match_define_struct_body(&me) {
@@ -346,14 +371,21 @@ impl RecursiveDescentParser {
 
             if self.term(Tokens::RightBC, false, None) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
-    
-        println!("结构体域分割错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+
+        println!(
+            "结构体域分割错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -361,14 +393,18 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::DefineVar);
 
-        if self.term(Tokens::Let, true, None) &&
-            self.match_define_var_mutable(&me) {
+        if self.term(Tokens::Let, true, None) && self.match_define_var_mutable(&me) {
             return true;
         }
 
-        println!("声明语句内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "声明语句内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -392,9 +428,14 @@ impl RecursiveDescentParser {
             }
         }
 
-        println!("声明可变错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "声明可变错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -402,16 +443,22 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::DefineVarS);
 
-        if self.term_identity(true, Some(&me)).is_some() && 
-            self.match_define_var_type(&me) &&
-            self.match_define_var_value(&me) && 
-            self.match_define_var_e(&me) {
+        if self.term_identity(true, Some(&me)).is_some()
+            && self.match_define_var_type(&me)
+            && self.match_define_var_value(&me)
+            && self.match_define_var_e(&me)
+        {
             return true;
         }
 
-        println!("声明单元错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "声明单元错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -429,17 +476,24 @@ impl RecursiveDescentParser {
 
             if self.terms(vec![Tokens::Is, Tokens::Comma, Tokens::EndExp], false, None) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("声明类型错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "声明类型错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
-    
+
     fn match_define_var_value(&mut self, root: &NodeId) -> bool {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::DefineVarValue);
@@ -454,16 +508,23 @@ impl RecursiveDescentParser {
 
             if self.terms(vec![Tokens::Comma, Tokens::EndExp], false, None) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("声明赋值错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "声明赋值错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
-    }   
+    }
 
     fn match_define_var_e(&mut self, root: &NodeId) -> bool {
         let cur = self.current;
@@ -479,16 +540,23 @@ impl RecursiveDescentParser {
 
             if self.term(Tokens::EndExp, false, None) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("声明分割错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "声明分割错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
-    } 
+    }
 
     fn match_exec_sentence(&mut self, root: &NodeId) -> bool {
         let cur = self.current;
@@ -496,16 +564,14 @@ impl RecursiveDescentParser {
 
         'l: {
             if self.term(Tokens::Let, false, None) {
-                if self.match_exec_stmt(&me) &&
-                    self.term(Tokens::EndExp, true, None) {
+                if self.match_exec_stmt(&me) && self.term(Tokens::EndExp, true, None) {
                     return true;
                 }
                 break 'l;
             }
 
             if self.term_identity(false, None).is_some() {
-                if self.match_exec_is(&me) &&
-                    self.term(Tokens::EndExp, true, None) {
+                if self.match_exec_is(&me) && self.term(Tokens::EndExp, true, None) {
                     return true;
                 }
                 break 'l;
@@ -526,33 +592,35 @@ impl RecursiveDescentParser {
             }
 
             if self.term(Tokens::LeftBC, false, None) {
-                if self.match_exec_loop(&me) &&
-                    self.term(Tokens::EndExp, true, None) {
+                if self.match_exec_loop(&me) && self.term(Tokens::EndExp, true, None) {
                     return true;
                 }
                 break 'l;
             }
 
             if self.term(Tokens::Return, false, None) {
-                if self.match_exec_ret(&me) &&
-                    self.term(Tokens::EndExp, true, None) {
+                if self.match_exec_ret(&me) && self.term(Tokens::EndExp, true, None) {
                     return true;
                 }
                 break 'l;
             }
 
             if self.term(Tokens::Break, false, None) {
-                if self.match_exec_break(&me) &&
-                    self.term(Tokens::EndExp, true, None) {
+                if self.match_exec_break(&me) && self.term(Tokens::EndExp, true, None) {
                     return true;
                 }
                 break 'l;
             }
         }
 
-        println!("语句内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "语句内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -565,13 +633,18 @@ impl RecursiveDescentParser {
                 if self.match_exec_r1(&me) {
                     return true;
                 }
-                break 'l; 
+                break 'l;
             }
         }
 
-        println!("表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -581,27 +654,40 @@ impl RecursiveDescentParser {
 
         'l: {
             if self.term(Tokens::OrS, true, Some(&me)) {
-                if self.match_exec_exp(&me) &&
-                    self.match_exec_r1(&me) {
+                if self.match_exec_exp(&me) && self.match_exec_r1(&me) {
                     return true;
                 }
                 break 'l;
             }
 
-            if self.terms(vec![
-                Tokens::RightC, Tokens::OrS, 
-                Tokens::Comma, Tokens::EndExp, 
-                Tokens::LeftBC, Tokens::Semicolon
-            ], false, None) {
+            if self.terms(
+                vec![
+                    Tokens::RightC,
+                    Tokens::OrS,
+                    Tokens::Comma,
+                    Tokens::EndExp,
+                    Tokens::LeftBC,
+                    Tokens::Semicolon,
+                ],
+                false,
+                None,
+            ) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("OrS 语句分割错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "OrS 语句分割错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -615,43 +701,62 @@ impl RecursiveDescentParser {
                     self.adjust_single_child(me);
                     return true;
                 }
-                break 'l; 
+                break 'l;
             }
         }
 
-        println!("表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
-    
+
     fn match_exec_r2(&mut self, root: &NodeId) -> bool {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecR2);
 
         'l: {
             if self.term(Tokens::AndS, true, Some(&me)) {
-                if self.match_exec_exp_ands(&me) &&
-                    self.match_exec_r2(&me) {
+                if self.match_exec_exp_ands(&me) && self.match_exec_r2(&me) {
                     return true;
                 }
                 break 'l;
             }
 
-            if self.terms(vec![
-                Tokens::RightC, Tokens::OrS,
-                Tokens::AndS, Tokens::Comma, 
-                Tokens::EndExp, Tokens::LeftBC, Tokens::Semicolon
-            ], false, None) {
+            if self.terms(
+                vec![
+                    Tokens::RightC,
+                    Tokens::OrS,
+                    Tokens::AndS,
+                    Tokens::Comma,
+                    Tokens::EndExp,
+                    Tokens::LeftBC,
+                    Tokens::Semicolon,
+                ],
+                false,
+                None,
+            ) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("AndS 表达式分割错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "AndS 表达式分割错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -665,13 +770,18 @@ impl RecursiveDescentParser {
                     self.adjust_single_child(me);
                     return true;
                 }
-                break 'l; 
+                break 'l;
             }
         }
 
-        println!("表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -681,28 +791,42 @@ impl RecursiveDescentParser {
 
         'l: {
             if self.term(Tokens::Or, true, Some(&me)) {
-                if self.match_exec_exp_or(&me) &&
-                    self.match_exec_r3(&me) {
+                if self.match_exec_exp_or(&me) && self.match_exec_r3(&me) {
                     return true;
                 }
                 break 'l;
             }
 
-            if self.terms(vec![
-                Tokens::RightC, Tokens::OrS,
-                Tokens::AndS, Tokens::Or, 
-                Tokens::Comma, Tokens::EndExp, 
-                Tokens::LeftBC, Tokens::Semicolon
-            ], false, None) {
+            if self.terms(
+                vec![
+                    Tokens::RightC,
+                    Tokens::OrS,
+                    Tokens::AndS,
+                    Tokens::Or,
+                    Tokens::Comma,
+                    Tokens::EndExp,
+                    Tokens::LeftBC,
+                    Tokens::Semicolon,
+                ],
+                false,
+                None,
+            ) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("Or 表达式错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "Or 表达式错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -716,13 +840,18 @@ impl RecursiveDescentParser {
                     self.adjust_single_child(me);
                     return true;
                 }
-                break 'l; 
+                break 'l;
             }
         }
 
-        println!("表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -732,28 +861,43 @@ impl RecursiveDescentParser {
 
         'l: {
             if self.term(Tokens::And, true, Some(&me)) {
-                if self.match_exec_exp_and(&me) &&
-                    self.match_exec_r4(&me) {
+                if self.match_exec_exp_and(&me) && self.match_exec_r4(&me) {
                     return true;
                 }
                 break 'l;
             }
 
-            if self.terms(vec![
-                Tokens::RightC, Tokens::OrS,
-                Tokens::AndS, Tokens::Or, Tokens::And, 
-                Tokens::Comma, Tokens::EndExp, 
-                Tokens::LeftBC, Tokens::Semicolon
-            ], false, None) {
+            if self.terms(
+                vec![
+                    Tokens::RightC,
+                    Tokens::OrS,
+                    Tokens::AndS,
+                    Tokens::Or,
+                    Tokens::And,
+                    Tokens::Comma,
+                    Tokens::EndExp,
+                    Tokens::LeftBC,
+                    Tokens::Semicolon,
+                ],
+                false,
+                None,
+            ) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("And 表达式问题，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "And 表达式问题，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -767,13 +911,18 @@ impl RecursiveDescentParser {
                     self.adjust_single_child(me);
                     return true;
                 }
-                break 'l; 
+                break 'l;
             }
         }
 
-        println!("表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -783,28 +932,45 @@ impl RecursiveDescentParser {
 
         'l: {
             if self.match_eqs(&me) {
-                if self.match_exec_exp_eq(&me) &&
-                    self.match_exec_r5(&me) {
+                if self.match_exec_exp_eq(&me) && self.match_exec_r5(&me) {
                     return true;
                 }
                 break 'l;
             }
 
-            if self.terms(vec![
-                Tokens::RightC, Tokens::OrS,
-                Tokens::AndS, Tokens::Or, Tokens::And,
-                Tokens::Eq, Tokens::Ne, 
-                Tokens::Comma, Tokens::EndExp, Tokens::LeftBC, Tokens::Semicolon
-            ], false, None) {
+            if self.terms(
+                vec![
+                    Tokens::RightC,
+                    Tokens::OrS,
+                    Tokens::AndS,
+                    Tokens::Or,
+                    Tokens::And,
+                    Tokens::Eq,
+                    Tokens::Ne,
+                    Tokens::Comma,
+                    Tokens::EndExp,
+                    Tokens::LeftBC,
+                    Tokens::Semicolon,
+                ],
+                false,
+                None,
+            ) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("等于非等于表达式错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "等于非等于表达式错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -818,13 +984,18 @@ impl RecursiveDescentParser {
                     self.adjust_single_child(me);
                     return true;
                 }
-                break 'l; 
+                break 'l;
             }
         }
 
-        println!("表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -834,28 +1005,45 @@ impl RecursiveDescentParser {
 
         'l: {
             if self.match_lgqs(&me) {
-                if self.match_exec_exp_lgq(&me) &&
-                    self.match_exec_r6(&me) {
+                if self.match_exec_exp_lgq(&me) && self.match_exec_r6(&me) {
                     return true;
                 }
                 break 'l;
             }
 
-            if self.terms(vec![
-                Tokens::RightC, Tokens::OrS,
-                Tokens::AndS, Tokens::Or, Tokens::And,
-                Tokens::Eq, Tokens::Ne, Tokens::Gt, Tokens::Lt,
-                Tokens::Ge, Tokens::Le, Tokens::Comma, 
-                Tokens::EndExp, Tokens::LeftBC, Tokens::Semicolon
-            ], false, None) {
+            if self.terms(
+                vec![
+                    Tokens::RightC,
+                    Tokens::OrS,
+                    Tokens::AndS,
+                    Tokens::Or,
+                    Tokens::And,
+                    Tokens::Eq,
+                    Tokens::Ne,
+                    Tokens::Gt,
+                    Tokens::Lt,
+                    Tokens::Ge,
+                    Tokens::Le,
+                    Tokens::Comma,
+                    Tokens::EndExp,
+                    Tokens::LeftBC,
+                    Tokens::Semicolon,
+                ],
+                false,
+                None,
+            ) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
-        
+
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -869,12 +1057,14 @@ impl RecursiveDescentParser {
                     self.adjust_single_child(me);
                     return true;
                 }
-                break 'l; 
+                break 'l;
             }
         }
 
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -884,28 +1074,47 @@ impl RecursiveDescentParser {
 
         'l: {
             if self.match_add_ops(&me) {
-                if self.match_exec_exp_add_op(&me) &&
-                    self.match_exec_r7(&me) {
+                if self.match_exec_exp_add_op(&me) && self.match_exec_r7(&me) {
                     return true;
                 }
                 break 'l;
             }
 
-            if self.terms(vec![
-                Tokens::RightC, Tokens::OrS,
-                Tokens::AndS, Tokens::Or, Tokens::And,
-                Tokens::Eq, Tokens::Ne, Tokens::Gt, Tokens::Lt,
-                Tokens::Ge, Tokens::Le, Tokens::Plus, Tokens::Minus, 
-                Tokens::Comma, Tokens::EndExp, Tokens::LeftBC, Tokens::Semicolon
-            ], false, None) {
+            if self.terms(
+                vec![
+                    Tokens::RightC,
+                    Tokens::OrS,
+                    Tokens::AndS,
+                    Tokens::Or,
+                    Tokens::And,
+                    Tokens::Eq,
+                    Tokens::Ne,
+                    Tokens::Gt,
+                    Tokens::Lt,
+                    Tokens::Ge,
+                    Tokens::Le,
+                    Tokens::Plus,
+                    Tokens::Minus,
+                    Tokens::Comma,
+                    Tokens::EndExp,
+                    Tokens::LeftBC,
+                    Tokens::Semicolon,
+                ],
+                false,
+                None,
+            ) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -919,13 +1128,18 @@ impl RecursiveDescentParser {
                     self.adjust_single_child(me);
                     return true;
                 }
-                break 'l; 
+                break 'l;
             }
         }
 
-        println!("表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -935,29 +1149,50 @@ impl RecursiveDescentParser {
 
         'l: {
             if self.match_multi_ops(&me) {
-                if self.match_exec_exp_multi_op(&me) &&
-                    self.match_exec_r8(&me) {
+                if self.match_exec_exp_multi_op(&me) && self.match_exec_r8(&me) {
                     return true;
                 }
                 break 'l;
             }
 
-            if self.terms(vec![
-                Tokens::RightC, Tokens::OrS,
-                Tokens::AndS, Tokens::Or, Tokens::And,
-                Tokens::Eq, Tokens::Ne, Tokens::Gt, Tokens::Lt,
-                Tokens::Ge, Tokens::Le, Tokens::Plus, Tokens::Minus,
-                Tokens::Mul, Tokens::Div, Tokens::Mod, 
-                Tokens::Comma, Tokens::EndExp, Tokens::LeftBC, Tokens::Semicolon
-            ], false, None) {
+            if self.terms(
+                vec![
+                    Tokens::RightC,
+                    Tokens::OrS,
+                    Tokens::AndS,
+                    Tokens::Or,
+                    Tokens::And,
+                    Tokens::Eq,
+                    Tokens::Ne,
+                    Tokens::Gt,
+                    Tokens::Lt,
+                    Tokens::Ge,
+                    Tokens::Le,
+                    Tokens::Plus,
+                    Tokens::Minus,
+                    Tokens::Mul,
+                    Tokens::Div,
+                    Tokens::Mod,
+                    Tokens::Comma,
+                    Tokens::EndExp,
+                    Tokens::LeftBC,
+                    Tokens::Semicolon,
+                ],
+                false,
+                None,
+            ) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -971,13 +1206,18 @@ impl RecursiveDescentParser {
                     self.adjust_single_child(me);
                     return true;
                 }
-                break 'l; 
+                break 'l;
             }
         }
 
-        println!("表达式内错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "表达式内错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -987,19 +1227,19 @@ impl RecursiveDescentParser {
 
         'l: {
             if self.term(Tokens::LeftC, true, Some(&me)) {
-                if self.match_exec_exp(&me) &&
-                    self.term(Tokens::RightC, true, Some(&me)) {
-                    return true;       
+                if self.match_exec_exp(&me) && self.term(Tokens::RightC, true, Some(&me)) {
+                    return true;
                 }
                 break 'l;
             }
 
-            if self.term_str(false, None).is_some() ||
-                self.term_int(false, None).is_some() || 
-                self.term_decimal(false, None).is_some() || 
-                self.term_bool(false, None).is_some() || 
-                self.term_identity(false, None).is_some() ||
-                self.term(Tokens::Match, false, None) {
+            if self.term_str(false, None).is_some()
+                || self.term_int(false, None).is_some()
+                || self.term_decimal(false, None).is_some()
+                || self.term_bool(false, None).is_some()
+                || self.term_identity(false, None).is_some()
+                || self.term(Tokens::Match, false, None)
+            {
                 if self.match_ops(&me) {
                     self.adjust_single_child(me);
                     return true;
@@ -1008,9 +1248,14 @@ impl RecursiveDescentParser {
             }
         }
 
-        println!("括号或单元成员错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "括号或单元成员错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1018,15 +1263,15 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::Eqs);
 
-        if self.terms(vec![
-            Tokens::Eq, Tokens::Ne
-        ], true, Some(&me)) {
+        if self.terms(vec![Tokens::Eq, Tokens::Ne], true, Some(&me)) {
             self.adjust_single_child(me);
             return true;
         }
 
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1034,16 +1279,19 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::LGqs);
 
-        if self.terms(vec![
-            Tokens::Gt, Tokens::Lt,
-            Tokens::Ge, Tokens::Le
-        ], true, Some(&me)) {
+        if self.terms(
+            vec![Tokens::Gt, Tokens::Lt, Tokens::Ge, Tokens::Le],
+            true,
+            Some(&me),
+        ) {
             self.adjust_single_child(me);
             return true;
         }
 
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1051,15 +1299,15 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::AddOps);
 
-        if self.terms(vec![
-            Tokens::Plus, Tokens::Minus
-        ], true, Some(&me)) {
+        if self.terms(vec![Tokens::Plus, Tokens::Minus], true, Some(&me)) {
             self.adjust_single_child(me);
             return true;
         }
 
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1067,15 +1315,15 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::MultiOps);
 
-        if self.terms(vec![
-            Tokens::Mul, Tokens::Div, Tokens::Mod
-        ], true, Some(&me)) {
+        if self.terms(vec![Tokens::Mul, Tokens::Div, Tokens::Mod], true, Some(&me)) {
             self.adjust_single_child(me);
             return true;
         }
 
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1083,26 +1331,33 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::SigOps);
 
-        if self.terms(vec![
-            Tokens::Negate, Tokens::Plus, Tokens::Minus
-        ], true, Some(&me)) {
+        if self.terms(
+            vec![Tokens::Negate, Tokens::Plus, Tokens::Minus],
+            true,
+            Some(&me),
+        ) {
             self.adjust_single_child(me);
             return true;
         }
 
-        if self.term_str(false, None).is_some() || 
-            self.term_int(false, None).is_some() ||
-            self.term_identity(false, None).is_some() ||
-            self.term_decimal(false, None).is_some() ||
-            self.term_bool(false, None).is_some() ||
-            self.terms(vec![Tokens::Match, Tokens::LeftC], false, None) {
+        if self.term_str(false, None).is_some()
+            || self.term_int(false, None).is_some()
+            || self.term_identity(false, None).is_some()
+            || self.term_decimal(false, None).is_some()
+            || self.term_bool(false, None).is_some()
+            || self.terms(vec![Tokens::Match, Tokens::LeftC], false, None)
+        {
             self.current = cur;
-            self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+            self.tree
+                .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                .unwrap();
             return true;
         }
 
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1126,10 +1381,11 @@ impl RecursiveDescentParser {
                 break 'l;
             }
 
-            if self.term_str(true, Some(&me)).is_some() ||
-                self.term_int(true, Some(&me)).is_some() ||
-                self.term_decimal(true, Some(&me)).is_some() ||
-                self.term_bool(true, Some(&me)).is_some() {
+            if self.term_str(true, Some(&me)).is_some()
+                || self.term_int(true, Some(&me)).is_some()
+                || self.term_decimal(true, Some(&me)).is_some()
+                || self.term_bool(true, Some(&me)).is_some()
+            {
                 self.adjust_single_child(me);
                 return true;
             }
@@ -1147,9 +1403,14 @@ impl RecursiveDescentParser {
             // }
         }
 
-        println!("非法成员引用词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "非法成员引用词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1157,14 +1418,18 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecStmt);
 
-        if self.term(Tokens::Let, false, None) && 
-            self.match_define_var(&me) {
+        if self.term(Tokens::Let, false, None) && self.match_define_var(&me) {
             return true;
         }
 
-        println!("成员声明内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "成员声明内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1172,14 +1437,18 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecRet);
 
-        if self.term(Tokens::Return, true, None) && 
-            self.match_exec_exp(&me) {
+        if self.term(Tokens::Return, true, None) && self.match_exec_exp(&me) {
             return true;
         }
 
-        println!("返回式内词法单元错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "返回式内词法单元错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1190,10 +1459,15 @@ impl RecursiveDescentParser {
         if self.term(Tokens::Break, true, None) {
             return true;
         }
-        
-        println!("Break 式内词法单元错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+
+        println!(
+            "Break 式内词法单元错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1201,16 +1475,22 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecIs);
 
-        if self.term_identity(false, None).is_some() && 
-            self.match_exec_var(&me) && 
-            self.match_exec_is_w(&me) && 
-            self.match_exec_exp(&me) {
+        if self.term_identity(false, None).is_some()
+            && self.match_exec_var(&me)
+            && self.match_exec_is_w(&me)
+            && self.match_exec_exp(&me)
+        {
             return true;
         }
 
-        println!("赋值语句内词法单元错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "赋值语句内词法单元错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1218,16 +1498,29 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecIsW);
 
-        if self.terms(vec![
-            Tokens::PlusIs, Tokens::MinusIs, Tokens::DivIs, 
-            Tokens::MulIs, Tokens::ModIs, Tokens::Is
-        ], true, Some(&me)) {
+        if self.terms(
+            vec![
+                Tokens::PlusIs,
+                Tokens::MinusIs,
+                Tokens::DivIs,
+                Tokens::MulIs,
+                Tokens::ModIs,
+                Tokens::Is,
+            ],
+            true,
+            Some(&me),
+        ) {
             return true;
         }
 
-        println!("非法赋值词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "非法赋值词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1235,46 +1528,67 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecMatch);
 
-        if self.term(Tokens::Match, true, None) && 
-            self.match_exec_exp(&me) &&
-            self.term(Tokens::LeftBC, true, None) &&
-            self.match_exec_match_s(&me) && 
-            self.term(Tokens::RightBC, true, None) {
+        if self.term(Tokens::Match, true, None)
+            && self.match_exec_exp(&me)
+            && self.term(Tokens::LeftBC, true, None)
+            && self.match_exec_match_s(&me)
+            && self.term(Tokens::RightBC, true, None)
+        {
             return true;
         }
 
-        println!("match 匹配式内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "match 匹配式内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
-    
+
     fn match_exec_match_s(&mut self, root: &NodeId) -> bool {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecMatchS);
 
-        if (self.term_str(false, None).is_some() ||
-            self.term_int(false, None).is_some() ||
-            self.term_decimal(false, None).is_some() ||
-            self.term_bool(false, None).is_some() ||
-            self.term_identity(false, None).is_some() || 
-            self.terms(vec![
-                Tokens::Match, Tokens::LeftC, Tokens::Negate, Tokens::Plus, Tokens::Minus
-            ], false, None)) && 
-                self.match_exec_exp(&me) &&
-                self.term(Tokens::Semicolon, true, None) &&
-                self.term(Tokens::LeftBC, true, None) && 
-                self.match_fn_body(&me) &&
-                self.term(Tokens::RightBC, true, None) && self.match_exec_match_e(&me) {
-            return true;       
+        if (self.term_str(false, None).is_some()
+            || self.term_int(false, None).is_some()
+            || self.term_decimal(false, None).is_some()
+            || self.term_bool(false, None).is_some()
+            || self.term_identity(false, None).is_some()
+            || self.terms(
+                vec![
+                    Tokens::Match,
+                    Tokens::LeftC,
+                    Tokens::Negate,
+                    Tokens::Plus,
+                    Tokens::Minus,
+                ],
+                false,
+                None,
+            ))
+            && self.match_exec_exp(&me)
+            && self.term(Tokens::Semicolon, true, None)
+            && self.term(Tokens::LeftBC, true, None)
+            && self.match_fn_body(&me)
+            && self.term(Tokens::RightBC, true, None)
+            && self.match_exec_match_e(&me)
+        {
+            return true;
         }
 
-        println!("match 匹配式域声明错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "match 匹配式域声明错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
-    
+
     fn match_exec_match_e(&mut self, root: &NodeId) -> bool {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecMatchE);
@@ -1289,14 +1603,21 @@ impl RecursiveDescentParser {
 
             if self.term(Tokens::RightBC, false, None) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("match 匹配式分割错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "match 匹配式分割错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1304,18 +1625,24 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecIf);
 
-        if self.term(Tokens::If, true, None) && 
-            self.match_exec_exp(&me) &&
-            self.term(Tokens::LeftBC, true, None) &&
-            self.match_fn_body(&me) && 
-            self.term(Tokens::RightBC, true, None) &&
-            self.match_exec_if_e(&me) {
+        if self.term(Tokens::If, true, None)
+            && self.match_exec_exp(&me)
+            && self.term(Tokens::LeftBC, true, None)
+            && self.match_fn_body(&me)
+            && self.term(Tokens::RightBC, true, None)
+            && self.match_exec_if_e(&me)
+        {
             return true;
         }
 
-        println!("If 判断式错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "If 判断式错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1325,36 +1652,57 @@ impl RecursiveDescentParser {
 
         'l: {
             if self.term(Tokens::Else, true, Some(&me)) {
-                if self.match_exec_if_ei(&me) && 
-                    self.term(Tokens::LeftBC, true, None) &&
-                    self.match_fn_body(&me) &&
-                    self.term(Tokens::RightBC, true, None) &&
-                    self.match_exec_if_e(&me) {
+                if self.match_exec_if_ei(&me)
+                    && self.term(Tokens::LeftBC, true, None)
+                    && self.match_fn_body(&me)
+                    && self.term(Tokens::RightBC, true, None)
+                    && self.match_exec_if_e(&me)
+                {
                     return true;
                 }
                 break 'l;
             }
 
-            if self.term_identity(false, None).is_some() ||
-                self.term_str(false, None).is_some() ||
-                self.term_int(false, None).is_some() ||
-                self.term_decimal(false, None).is_some() ||
-                self.term_bool(false, None).is_some() ||
-                self.terms(vec![
-                    Tokens::Let, Tokens::If, Tokens::While,
-                    Tokens::LeftBC, Tokens::Return, Tokens::Break, 
-                    Tokens::Match, Tokens::LeftC, Tokens::Negate, 
-                    Tokens::Plus, Tokens::Minus, Tokens::RightBC
-                ], false, None) {
+            if self.term_identity(false, None).is_some()
+                || self.term_str(false, None).is_some()
+                || self.term_int(false, None).is_some()
+                || self.term_decimal(false, None).is_some()
+                || self.term_bool(false, None).is_some()
+                || self.terms(
+                    vec![
+                        Tokens::Let,
+                        Tokens::If,
+                        Tokens::While,
+                        Tokens::LeftBC,
+                        Tokens::Return,
+                        Tokens::Break,
+                        Tokens::Match,
+                        Tokens::LeftC,
+                        Tokens::Negate,
+                        Tokens::Plus,
+                        Tokens::Minus,
+                        Tokens::RightBC,
+                    ],
+                    false,
+                    None,
+                )
+            {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("If 式 else 或 else if 式表示错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "If 式 else 或 else if 式表示错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1372,14 +1720,21 @@ impl RecursiveDescentParser {
 
             if self.term(Tokens::LeftBC, false, Some(&me)) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("else if 表示错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "else if 表示错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1387,17 +1742,23 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecWhile);
 
-        if self.term(Tokens::While, true, None) && 
-            self.match_exec_exp(&me) &&
-            self.term(Tokens::LeftBC, true, None) &&
-            self.match_fn_body(&me) && 
-            self.term(Tokens::RightBC, true, None) {
+        if self.term(Tokens::While, true, None)
+            && self.match_exec_exp(&me)
+            && self.term(Tokens::LeftBC, true, None)
+            && self.match_fn_body(&me)
+            && self.term(Tokens::RightBC, true, None)
+        {
             return true;
         }
 
-        println!("While 式内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "While 式内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1405,17 +1766,23 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecLoop);
 
-        if self.term(Tokens::LeftBC, true, None) && 
-            self.match_fn_body(&me) &&
-            self.term(Tokens::RightBC, true, None) && 
-            self.term(Tokens::Loop, true, None) &&
-            self.match_exec_exp(&me) {
+        if self.term(Tokens::LeftBC, true, None)
+            && self.match_fn_body(&me)
+            && self.term(Tokens::RightBC, true, None)
+            && self.term(Tokens::Loop, true, None)
+            && self.match_exec_exp(&me)
+        {
             return true;
         }
 
-        println!("Loop 式内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "Loop 式内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1423,14 +1790,18 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecVar);
 
-        if self.term_identity(true, Some(&me)).is_some() && 
-            self.match_exec_var_t(&me) {
+        if self.term_identity(true, Some(&me)).is_some() && self.match_exec_var_t(&me) {
             return true;
         }
 
-        println!("成员引用表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "成员引用表达式内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1440,43 +1811,80 @@ impl RecursiveDescentParser {
 
         'l: {
             if self.term(Tokens::LeftMB, true, Some(&me)) {
-                if self.term_int(true, Some(&me)).is_some() &&
-                    self.term(Tokens::RightMB, true, Some(&me)) &&
-                    self.match_exec_var_t(&me) {
+                if self.term_int(true, Some(&me)).is_some()
+                    && self.term(Tokens::RightMB, true, Some(&me))
+                    && self.match_exec_var_t(&me)
+                {
                     return true;
                 }
                 break 'l;
             }
 
             if self.term(Tokens::ShouldReturn, true, Some(&me)) {
-                if self.match_exec_var_soe(&me) &&
-                    self.match_exec_var_t(&me) {
-                    return true;
-                }
-                break 'l;
-            }            
-
-            if self.term(Tokens::LeftC, true, Some(&me)) {
-                if self.match_exec_func_p(&me) &&
-                    self.term(Tokens::RightC, true, Some(&me)) &&
-                    self.match_exec_var_t(&me) {
+                if self.match_exec_var_soe(&me) && self.match_exec_var_t(&me) {
                     return true;
                 }
                 break 'l;
             }
 
-            if self.terms(vec![
-                Tokens::PlusIs, Tokens::MinusIs, Tokens::DivIs, Tokens::MulIs, Tokens::ModIs, Tokens::Is, Tokens::RightC, Tokens::OrS, Tokens::AndS, Tokens::Or, Tokens::And, Tokens::Eq, Tokens::Ne, Tokens::Gt, Tokens::Lt, Tokens::Ge, Tokens::Le, Tokens::Plus, Tokens::Minus, Tokens::Mul, Tokens::Div, Tokens::Mod, Tokens::Comma, Tokens::EndExp, Tokens::LeftBC, Tokens::Semicolon
-            ], false, None) {
+            if self.term(Tokens::LeftC, true, Some(&me)) {
+                if self.match_exec_func_p(&me)
+                    && self.term(Tokens::RightC, true, Some(&me))
+                    && self.match_exec_var_t(&me)
+                {
+                    return true;
+                }
+                break 'l;
+            }
+
+            if self.terms(
+                vec![
+                    Tokens::PlusIs,
+                    Tokens::MinusIs,
+                    Tokens::DivIs,
+                    Tokens::MulIs,
+                    Tokens::ModIs,
+                    Tokens::Is,
+                    Tokens::RightC,
+                    Tokens::OrS,
+                    Tokens::AndS,
+                    Tokens::Or,
+                    Tokens::And,
+                    Tokens::Eq,
+                    Tokens::Ne,
+                    Tokens::Gt,
+                    Tokens::Lt,
+                    Tokens::Ge,
+                    Tokens::Le,
+                    Tokens::Plus,
+                    Tokens::Minus,
+                    Tokens::Mul,
+                    Tokens::Div,
+                    Tokens::Mod,
+                    Tokens::Comma,
+                    Tokens::EndExp,
+                    Tokens::LeftBC,
+                    Tokens::Semicolon,
+                ],
+                false,
+                None,
+            ) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("复合结构、结构体引用、函数调用表示错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "复合结构、结构体引用、函数调用表示错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1484,14 +1892,19 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecVarSoE);
 
-        if self.term_int(true, Some(&me)).is_some() ||
-            self.term_identity(true, Some(&me)).is_some() {
+        if self.term_int(true, Some(&me)).is_some() || self.term_identity(true, Some(&me)).is_some()
+        {
             return true;
         }
 
-        println!("元组、结构体域引用错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "元组、结构体域引用错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1500,14 +1913,23 @@ impl RecursiveDescentParser {
         let me = insert_nt!(self.tree, root, NT::ExecFuncP);
 
         'l: {
-            if self.term_str(false, None).is_some() ||
-                self.term_int(false, None).is_some() ||
-                self.term_decimal(false, None).is_some() ||
-                self.term_bool(false, None).is_some() ||
-                self.term_identity(false, None).is_some() ||
-                self.terms(vec![
-                    Tokens::Match, Tokens::LeftC, Tokens::Negate, Tokens::Plus, Tokens::Minus
-                ], false, None) {
+            if self.term_str(false, None).is_some()
+                || self.term_int(false, None).is_some()
+                || self.term_decimal(false, None).is_some()
+                || self.term_bool(false, None).is_some()
+                || self.term_identity(false, None).is_some()
+                || self.terms(
+                    vec![
+                        Tokens::Match,
+                        Tokens::LeftC,
+                        Tokens::Negate,
+                        Tokens::Plus,
+                        Tokens::Minus,
+                    ],
+                    false,
+                    None,
+                )
+            {
                 if self.match_exec_func_params(&me) {
                     return true;
                 }
@@ -1516,14 +1938,21 @@ impl RecursiveDescentParser {
 
             if self.term(Tokens::RightC, false, None) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("函数调用内参数填写错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "函数调用内参数填写错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1531,22 +1960,36 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecFuncParams);
 
-        if (self.term_str(false, None).is_some() ||
-            self.term_int(false, None).is_some() ||
-            self.term_decimal(false, None).is_some() ||
-            self.term_bool(false, None).is_some() ||
-            self.term_identity(false, None).is_some() || 
-            self.terms(vec![
-                Tokens::Match, Tokens::LeftC, Tokens::Negate, Tokens::Plus, Tokens::Minus
-            ], false, None)) && 
-            self.match_exec_exp(&me) && 
-            self.match_exec_func_params_e(&me) {
+        if (self.term_str(false, None).is_some()
+            || self.term_int(false, None).is_some()
+            || self.term_decimal(false, None).is_some()
+            || self.term_bool(false, None).is_some()
+            || self.term_identity(false, None).is_some()
+            || self.terms(
+                vec![
+                    Tokens::Match,
+                    Tokens::LeftC,
+                    Tokens::Negate,
+                    Tokens::Plus,
+                    Tokens::Minus,
+                ],
+                false,
+                None,
+            ))
+            && self.match_exec_exp(&me)
+            && self.match_exec_func_params_e(&me)
+        {
             return true;
         }
 
-        println!("函数调用参数表示错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "函数调用参数表示错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1564,14 +2007,21 @@ impl RecursiveDescentParser {
 
             if self.term(Tokens::RightC, false, None) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("函数调用参数连接表示错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "函数调用参数连接表示错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1585,27 +2035,32 @@ impl RecursiveDescentParser {
             }
 
             if self.term(Tokens::LeftMB, true, Some(&me)) {
-                if self.match_exec_type(&me) &&
-                    self.term(Tokens::EndExp, true, Some(&me)) &&
-                    self.term_int(true, Some(&me)).is_some() &&
-                    self.term(Tokens::RightMB, true, Some(&me)) {
+                if self.match_exec_type(&me)
+                    && self.term(Tokens::EndExp, true, Some(&me))
+                    && self.term_int(true, Some(&me)).is_some()
+                    && self.term(Tokens::RightMB, true, Some(&me))
+                {
                     return true;
                 }
                 break 'l;
             }
 
             if self.term(Tokens::LeftC, true, Some(&me)) {
-                if self.match_exec_types_p(&me) &&
-                    self.term(Tokens::RightC, true, Some(&me)) {
-                    return true;       
+                if self.match_exec_types_p(&me) && self.term(Tokens::RightC, true, Some(&me)) {
+                    return true;
                 }
                 break 'l;
             }
         }
 
-        println!("类型声明错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "类型声明错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1614,10 +2069,9 @@ impl RecursiveDescentParser {
         let me = insert_nt!(self.tree, root, NT::ExecTypesP);
 
         'l: {
-            if self.term_identity(false, None).is_some() || 
-                self.terms(vec![
-                    Tokens::LeftMB, Tokens::LeftC
-                ], false, None) {
+            if self.term_identity(false, None).is_some()
+                || self.terms(vec![Tokens::LeftMB, Tokens::LeftC], false, None)
+            {
                 if self.match_exec_types_params(&me) {
                     return true;
                 }
@@ -1626,14 +2080,21 @@ impl RecursiveDescentParser {
 
             if self.term(Tokens::RightC, false, None) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("元组类型声明错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "元组类型声明错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1641,14 +2102,18 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::ExecTypesParams);
 
-        if self.match_exec_type(&me) &&
-            self.match_exec_types_params_e(&me) {
+        if self.match_exec_type(&me) && self.match_exec_types_params_e(&me) {
             return true;
         }
 
-        println!("元组类型域声明错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "元组类型域声明错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1666,14 +2131,21 @@ impl RecursiveDescentParser {
 
             if self.term(Tokens::RightC, false, None) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("元组类型内类型连接错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "元组类型内类型连接错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1681,21 +2153,27 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::DefineFn);
 
-        if self.term(Tokens::Fn, true, None) && 
-            self.term_identity(true, Some(&me)).is_some() &&
-            self.term(Tokens::LeftC, true, None) && 
-            self.match_fn_p(&me) &&
-            self.term(Tokens::RightC, true, None) &&
-            self.match_fn_return(&me) &&
-            self.term(Tokens::LeftBC, true, None) &&
-            self.match_fn_body(&me) && 
-            self.term(Tokens::RightBC, true, None) {
+        if self.term(Tokens::Fn, true, None)
+            && self.term_identity(true, Some(&me)).is_some()
+            && self.term(Tokens::LeftC, true, None)
+            && self.match_fn_p(&me)
+            && self.term(Tokens::RightC, true, None)
+            && self.match_fn_return(&me)
+            && self.term(Tokens::LeftBC, true, None)
+            && self.match_fn_body(&me)
+            && self.term(Tokens::RightBC, true, None)
+        {
             return true;
         }
 
-        println!("函数定义内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "函数定义内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1710,17 +2188,24 @@ impl RecursiveDescentParser {
                 }
                 break 'l;
             }
-            
+
             if self.term(Tokens::RightC, false, None) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("函数定义-参数表示错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "函数定义-参数表示错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1728,15 +2213,22 @@ impl RecursiveDescentParser {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::FnParams);
 
-        if self.term_identity(true, Some(&me)).is_some() && 
-            self.term(Tokens::Semicolon, true, None) &&
-            self.match_exec_type(&me) && self.match_fn_params_e(&me) {
+        if self.term_identity(true, Some(&me)).is_some()
+            && self.term(Tokens::Semicolon, true, None)
+            && self.match_exec_type(&me)
+            && self.match_fn_params_e(&me)
+        {
             return true;
         }
 
-        println!("函数定义-参数声明域内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "函数定义-参数声明域内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1751,17 +2243,24 @@ impl RecursiveDescentParser {
                 }
                 break 'l;
             }
-            
+
             if self.term(Tokens::RightC, false, None) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("函数定义-参数声明连接错误，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "函数定义-参数声明连接错误，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 
@@ -1776,33 +2275,46 @@ impl RecursiveDescentParser {
                 }
                 break 'l;
             }
-            
+
             if self.term(Tokens::LeftBC, false, None) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("函数定义-返回类型声明非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "函数定义-返回类型声明非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
-    
+
     fn match_fn_body(&mut self, root: &NodeId) -> bool {
         let cur = self.current;
         let me = insert_nt!(self.tree, root, NT::FnBody);
 
         'l: {
-            if self.terms(vec![
-                Tokens::Let, Tokens::If, 
-                Tokens::While, Tokens::LeftBC, 
-                Tokens::Return, Tokens::Break
-            ], false, None) || 
-                self.term_identity(false, None).is_some() {
-                if self.match_exec_sentence(&me) &&
-                    self.match_fn_body(&me) {
+            if self.terms(
+                vec![
+                    Tokens::Let,
+                    Tokens::If,
+                    Tokens::While,
+                    Tokens::LeftBC,
+                    Tokens::Return,
+                    Tokens::Break,
+                ],
+                false,
+                None,
+            ) || self.term_identity(false, None).is_some()
+            {
+                if self.match_exec_sentence(&me) && self.match_fn_body(&me) {
                     return true;
                 }
                 break 'l;
@@ -1810,14 +2322,21 @@ impl RecursiveDescentParser {
 
             if self.term(Tokens::RightBC, false, None) {
                 self.current = cur;
-                self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+                self.tree
+                    .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
                 return true;
             }
         }
 
-        println!("函数定义-函数体内非法词法单元，目前词法单元：{:?}，位置: {:?}", self.tokens[self.current], self.current);
+        println!(
+            "函数定义-函数体内非法词法单元，目前词法单元：{:?}，位置: {:?}",
+            self.tokens[self.current], self.current
+        );
         self.current = cur;
-        self.tree.remove_node(me, id_tree::RemoveBehavior::DropChildren).unwrap();
+        self.tree
+            .remove_node(me, id_tree::RemoveBehavior::DropChildren)
+            .unwrap();
         false
     }
 }
@@ -1826,7 +2345,7 @@ impl RecursiveDescentParser {
 mod ll_parser_tests {
     use std::fs::File;
 
-    use crate::lex::{preprocessor::preprocessor};
+    use crate::lex::preprocessor::preprocessor;
 
     use super::*;
 

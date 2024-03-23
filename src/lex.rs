@@ -12,7 +12,7 @@ pub mod preprocessor;
 /// 2. /* */ 块注释（跨行），值要带上注释
 /// 3. //! 模块注释（文件，每次一行），值要带上注释
 /// 运算符号：
-/// 1. + - * / % ! > < = += -= *= /= %= >= <= == != & && | || 
+/// 1. + - * / % ! > < = += -= *= /= %= >= <= == != & && | ||
 /// 分隔符：
 /// 1. ; , : . () {} []
 /// 字符串常量：
@@ -127,7 +127,7 @@ pub enum Tokens {
     /// 源程序读入结束标志（也可以作为语法的开始标志）
     End,
     /// 空
-    Null
+    Null,
 }
 
 impl Tokens {
@@ -185,7 +185,7 @@ impl Tokens {
             Tokens::ShouldReturn => "(ShouldReturn, )".to_string(),
             Tokens::Return => "(Return, )".to_string(),
             Tokens::End => "(End, )".to_string(),
-            Tokens::Null => "(ε, )".to_string()
+            Tokens::Null => "(ε, )".to_string(),
         }
     }
 }
